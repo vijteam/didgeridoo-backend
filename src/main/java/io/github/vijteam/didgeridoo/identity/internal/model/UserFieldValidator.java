@@ -12,6 +12,7 @@ final class UserFieldValidator {
         "^[A-Za-z][A-Za-z0-9]*(?:[._-][A-Za-z0-9]+)*$"
     );
 
+    // TODO 1: расширить формат email (включая не только email на латинице)
     private static final Pattern EMAIL_PATTERN = Pattern.compile(
         "^[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+"
         + "(?:\\.[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+)*"

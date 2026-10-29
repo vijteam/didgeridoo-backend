@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+// TODO 2: добавить тесты на расширенный формат email
 class UserTest {
 
     private User createUser(String username, String displayName, String email) {
