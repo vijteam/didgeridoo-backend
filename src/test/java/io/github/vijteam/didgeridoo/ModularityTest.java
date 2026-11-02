@@ -7,7 +7,6 @@ class ModularityTest {
 
     @Test
     void shouldVerifyModuleDependencies() {
-        ApplicationModules.of(DidgeridooApplication.class)
-            .verify();
+        ApplicationModules.of(DidgeridooApplication.class).verify();
     }
 }

@@ -70,3 +70,35 @@ docker compose up -d
 Для их выполнения достаточно запущенного Docker. Отдельно запускать базу данных через `docker compose up -d` не требуется.
 
 Тестовый контейнер создаётся автоматически и удаляется после завершения тестов.
+
+## Форматирование и проверка стиля кода
+
+Spotless проверяет и автоматически форматирует Java-файлы.
+
+### Проверка
+
+**Windows (PowerShell):**
+
+```powershell
+.\mvnw.cmd spotless:check
+```
+
+**Linux / macOS:**
+
+```bash
+./mvnw spotless:check
+```
+
+### Применение форматирования
+
+**Windows (PowerShell):**
+
+```powershell
+.\mvnw.cmd spotless:apply
+```
+
+**Linux / macOS:**
+
+```bash
+./mvnw spotless:apply
+```

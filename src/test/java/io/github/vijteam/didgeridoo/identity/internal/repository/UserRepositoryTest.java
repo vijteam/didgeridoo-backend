@@ -6,44 +6,40 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.util.Optional;
-
-import org.springframework.context.annotation.Import;
 import io.github.vijteam.didgeridoo.TestcontainersConfiguration;
+import io.github.vijteam.didgeridoo.identity.internal.model.User;
+
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
-
-import io.github.vijteam.didgeridoo.identity.internal.model.User;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Optional;
 
 @SpringBootTest
 @Import(TestcontainersConfiguration.class)
 @Transactional
 class UserRepositoryTest {
 
-    @Autowired 
-    private UserRepository userRepository;
+    @Autowired private UserRepository userRepository;
 
-    @PersistenceContext
-    private EntityManager entityManager;
+    @PersistenceContext private EntityManager entityManager;
 
     @Test
     void shouldReturnEmptyForUnknownUsername() {
-        Optional<User> result =
-            userRepository.findByUsername("nonexistent_repo_user_98765");
+        Optional<User> result = userRepository.findByUsername("nonexistent_repo_user_98765");
 
         assertTrue(result.isEmpty());
     }
 
     @Test
     void shouldFindExistingUsernameIgnoringCase() {
-        User user = new User(
-            "RepoAlice", "Alice", "alice.repo@example.com", "hash"
-        );
+        User user = new User("RepoAlice", "Alice", "alice.repo@example.com", "hash");
 
         userRepository.saveAndFlush(user);
 
@@ -51,18 +47,14 @@ class UserRepositoryTest {
         assertTrue(userRepository.existsByUsername("REPOALICE"));
         assertFalse(userRepository.existsByUsername("another_repo_user"));
 
-        User found = userRepository
-            .findByUsername("repoalice")
-            .orElseThrow();
-        
+        User found = userRepository.findByUsername("repoalice").orElseThrow();
+
         assertEquals("RepoAlice", found.getUsername());
     }
 
     @Test
     void shouldFindExistingEmailIgnoringCase() {
-        User user = new User(
-            "RepoBob", "Bob", "Bob.Repo@Example.com", "hash"
-        );
+        User user = new User("RepoBob", "Bob", "Bob.Repo@Example.com", "hash");
 
         userRepository.saveAndFlush(user);
 
@@ -73,46 +65,35 @@ class UserRepositoryTest {
 
     @Test
     void shouldRejectDuplicateUsernameIgnoringCase() {
-        User first = new User(
-            "RepoCharlie", "Charlie", "charlie.first@example.com", "hash"
-        );
+        User first = new User("RepoCharlie", "Charlie", "charlie.first@example.com", "hash");
 
-        User second = new User(
-            "repocharlie", "Another Charlie", "charlie.second@example.com", "hash"
-        );
+        User second =
+                new User("repocharlie", "Another Charlie", "charlie.second@example.com", "hash");
 
         userRepository.saveAndFlush(first);
 
         assertThrows(
-            DataIntegrityViolationException.class,
-            () -> userRepository.saveAndFlush(second)
-        );
+                DataIntegrityViolationException.class, () -> userRepository.saveAndFlush(second));
     }
 
     @Test
     void shouldRejectDuplicateEmailIgnoringCase() {
-        User first = new User(
-            "RepoDavid1", "David", "David.Repo@Example.com", "hash"
-        );
+        User first = new User("RepoDavid1", "David", "David.Repo@Example.com", "hash");
 
-        User second = new User(
-            "RepoDavid2", "Another David", "david.repo@example.com", "hash"
-        );
+        User second = new User("RepoDavid2", "Another David", "david.repo@example.com", "hash");
 
         userRepository.saveAndFlush(first);
 
         assertThrows(
-            DataIntegrityViolationException.class,
-            () -> userRepository.saveAndFlush(second)
-        );
+                DataIntegrityViolationException.class, () -> userRepository.saveAndFlush(second));
     }
 
     @Test
     void shouldPersistAndLoadUserFields() {
-        User user = new User(
-            "RepoEdward", "Edward",
-            "edward.repo@example.com", "stored-hash"
-        );
+        User user =
+                new User(
+                        "RepoEdward", "Edward",
+                        "edward.repo@example.com", "stored-hash");
 
         userRepository.saveAndFlush(user);
 
