@@ -24,6 +24,7 @@ class StatusInitializationTest {
     @Autowired private StatusInitializer initializer;
     @Autowired private TaskCreationService creation;
     @Autowired private TaskReadingService reading;
+    @Autowired private TaskEditingService editing;
     @Autowired private TaskStatusRepository statuses;
     @Autowired private TransactionTemplate transaction;
 
@@ -92,6 +93,24 @@ class StatusInitializationTest {
         assertThrows(
                 IllegalStateException.class, () -> reading.get(space, actor, UUID.randomUUID()));
         assertThrows(IllegalStateException.class, () -> reading.list(space, actor, 0, 20));
+    }
+
+    @Test
+    void editingFailsClosedWithoutSpacesAdapter() {
+        assertThrows(
+                IllegalStateException.class,
+                () ->
+                        editing.edit(
+                                UUID.randomUUID(),
+                                UUID.randomUUID(),
+                                UUID.randomUUID(),
+                                new EditTask(
+                                        "Task",
+                                        null,
+                                        null,
+                                        io.github.vijteam.didgeridoo.tasks.internal.model
+                                                .TaskPriority.MEDIUM,
+                                        null)));
     }
 
     @Test

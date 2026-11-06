@@ -161,6 +161,15 @@ bash ./mvnw spotless:apply
 
 ### Чтение задач (внутренний сервис)
 
+
 `TaskReadingService.get(spaceId, actorId, taskId)` возвращает неизменяемый `TaskView`; поиск ограничен пространством. `list(spaceId, actorId, page, size)` читает страницу с порядком `createdAt ASC, id ASC`, page от 0, size от 1 до 100 (локальный технический предел). Фильтры и HTTP-контракт пока не добавлены.
 
 Действующие OWNER/MEMBER/GUEST могут читать; посторонним отказ даже для пустого списка. Членство проверяется при каждом вызове. При отсутствующем адаптере spaces чтение отклоняется. Проверки текущего этапа используют тестового поставщика ролей и реальный PostgreSQL; интеграция с spaces и security остаётся отдельным этапом. Отсутствующая задача и задача другого пространства дают одинаковый `NoSuchElementException` после проверки доступа. Эти исключения пока не являются согласованным HTTP-форматом ошибок.
+
+### Task editing (internal service)
+
+`TaskEditingService.edit(spaceId, actorId, taskId, EditTask)` replaces content: title/priority are required, null description/deadline clears the field, null assigneeCanEdit keeps its value. This is not a PATCH contract. Status, assignment, space and creator cannot be changed here; tags remain outside this slice.
+
+OWNER and active MEMBER creators can edit content and the permission flag. Active MEMBER assignees with assigneeCanEdit can edit content only. GUEST and outsiders are denied, as are calls without the spaces adapter.
+
+Editing locks the task row inside the transaction. UPDATED contains only changed fields with old/new values. Identical content produces neither history nor a timestamp update. History failure rolls back the task update. The lock serializes internal edits; stale HTTP request detection and coordination with membership changes still require integration.

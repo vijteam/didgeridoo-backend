@@ -14,6 +14,7 @@ import org.hibernate.type.SqlTypes;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 @Entity
@@ -52,19 +53,48 @@ public class TaskChange {
         change.actorId = actorId;
         change.kind = "CREATED";
         change.changedFields = new LinkedHashMap<>();
-        change.add("title", task.getTitle());
-        change.add("description", task.getDescription());
-        change.add("deadline", task.getDeadline() == null ? null : task.getDeadline().toString());
-        change.add("priority", task.getPriority().name());
-        change.add("statusId", task.getStatusId().toString());
-        change.add(
+        snapshot(task).forEach(change::add);
+        return change;
+    }
+
+    public static Map<String, Object> snapshot(Task task) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("title", task.getTitle());
+        result.put("description", task.getDescription());
+        result.put("deadline", task.getDeadline() == null ? null : task.getDeadline().toString());
+        result.put("priority", task.getPriority().name());
+        result.put("statusId", task.getStatusId().toString());
+        result.put(
                 "assigneeId",
                 task.getAssigneeId() == null ? null : task.getAssigneeId().toString());
-        change.add("assigneeCanEdit", task.isAssigneeCanEdit());
-        change.add(
+        result.put("assigneeCanEdit", task.isAssigneeCanEdit());
+        result.put(
                 "assignmentSource",
                 task.getAssignmentSource() == null ? null : task.getAssignmentSource().name());
+        return result;
+    }
+
+    public static TaskChange updated(Task task, UUID actorId, Map<String, Object> before) {
+        TaskChange change = new TaskChange();
+        change.taskId = task.getId();
+        change.actorId = actorId;
+        change.kind = "UPDATED";
+        change.changedFields = new LinkedHashMap<>();
+        snapshot(task)
+                .forEach(
+                        (field, value) -> {
+                            if (!Objects.equals(before.get(field), value)) {
+                                Map<String, Object> values = new LinkedHashMap<>();
+                                values.put("old", before.get(field));
+                                values.put("new", value);
+                                change.changedFields.put(field, values);
+                            }
+                        });
         return change;
+    }
+
+    public boolean hasChanges() {
+        return !changedFields.isEmpty();
     }
 
     private void add(String field, Object value) {
