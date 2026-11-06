@@ -5,6 +5,7 @@ import java.util.Objects;
 public class TaskDependencyException extends IllegalStateException {
     public enum Reason {
         SPACES_UNAVAILABLE,
+        AUTHENTICATION_UNAVAILABLE,
         INITIAL_STATUS_MISSING
     }
 
