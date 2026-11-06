@@ -113,7 +113,7 @@ bash ./mvnw test
 
 Модуль spaces пока не предоставлен. Поэтому `space_id` хранится как UUID без внешнего ключа к пространствам; таблицы `spaces` и `space_memberships` эта реализация не создаёт. Составной ключ задачи и статуса уже запрещает использовать статус с другим `space_id`. Внешние ключи к существующим пользователям и согласованность исполнителя с источником назначения также проверяются БД.
 
-При интеграции с Владом отдельная миграция должна добавить внешние ключи к пространствам/участникам после проверки существующих данных. До этого БД не подтверждает существование пространства, членство или роль исполнителя. Это ещё не готовый авторизованный HTTP API; соответствующие проверки будут выполняться сервисами через публичный контракт spaces.
+При интеграции с модулем spaces отдельная миграция должна добавить внешние ключи к пространствам/участникам после проверки существующих данных. До этого БД не подтверждает существование пространства, членство или роль исполнителя. Это ещё не готовый авторизованный HTTP API; соответствующие проверки будут выполняться сервисами через публичный контракт spaces.
 
 ## Форматирование и проверка стиля кода
 
@@ -161,15 +161,20 @@ bash ./mvnw spotless:apply
 
 ### Чтение задач (внутренний сервис)
 
-
 `TaskReadingService.get(spaceId, actorId, taskId)` возвращает неизменяемый `TaskView`; поиск ограничен пространством. `list(spaceId, actorId, page, size)` читает страницу с порядком `createdAt ASC, id ASC`, page от 0, size от 1 до 100 (локальный технический предел). Фильтры и HTTP-контракт пока не добавлены.
 
 Действующие OWNER/MEMBER/GUEST могут читать; посторонним отказ даже для пустого списка. Членство проверяется при каждом вызове. При отсутствующем адаптере spaces чтение отклоняется. Проверки текущего этапа используют тестового поставщика ролей и реальный PostgreSQL; интеграция с spaces и security остаётся отдельным этапом. Отсутствующая задача и задача другого пространства дают одинаковый `NoSuchElementException` после проверки доступа. Эти исключения пока не являются согласованным HTTP-форматом ошибок.
 
-### Task editing (internal service)
+### Редактирование задачи (внутренний сервис)
 
-`TaskEditingService.edit(spaceId, actorId, taskId, EditTask)` replaces content: title/priority are required, null description/deadline clears the field, null assigneeCanEdit keeps its value. This is not a PATCH contract. Status, assignment, space and creator cannot be changed here; tags remain outside this slice.
+`TaskEditingService.edit(spaceId, actorId, taskId, EditTask)` заменяет содержание задачи: title и priority обязательны, null в description или deadline очищает поле, null в assigneeCanEdit сохраняет текущее значение флага. Семантика PATCH здесь не определена. Статус, назначение, пространство и создатель этой операцией не меняются; теги пока не реализованы.
 
-OWNER and active MEMBER creators can edit content and the permission flag. Active MEMBER assignees with assigneeCanEdit can edit content only. GUEST and outsiders are denied, as are calls without the spaces adapter.
+OWNER и создатель с действующей ролью MEMBER могут менять содержание и флаг разрешения. Исполнитель с действующей ролью MEMBER и включённым assigneeCanEdit может менять только содержание. GUEST и посторонним отказ; без адаптера spaces операция также отклоняется.
 
-Editing locks the task row inside the transaction. UPDATED contains only changed fields with old/new values. Identical content produces neither history nor a timestamp update. History failure rolls back the task update. The lock serializes internal edits; stale HTTP request detection and coordination with membership changes still require integration.
+Строка задачи блокируется внутри транзакции. UPDATED содержит только изменённые поля со значениями old/new. Сохранение без изменений не создаёт историю и не меняет updatedAt. Ошибка записи истории откатывает изменение задачи. Блокировка упорядочивает параллельные операции редактирования; обнаружение устаревших HTTP-запросов и согласование с изменением членства требуют дальнейшей интеграции.
+
+### Смена статуса (внутренний сервис)
+
+`TaskStatusChangeService.change(spaceId, actorId, taskId, statusId)` разрешает смену статуса создателю или исполнителю с действующей ролью MEMBER, любому MEMBER для свободной задачи и OWNER. GUEST и посторонним отказ. Это право не зависит от assigneeCanEdit. Задача и выбранный статус должны принадлежать указанному пространству; назначение и содержание не меняются.
+
+Строка задачи блокируется, а смена статуса сохраняется одной транзакцией с UPDATED, содержащим только старое и новое значения statusId. Ошибка истории откатывает статус. Выбор текущего статуса не создаёт историю и не меняет updatedAt. Возврат из FINAL разрешён. Без адаптера spaces операция отклоняется; HTTP, авторизация и интеграция с реальным членством пока не подключены.
