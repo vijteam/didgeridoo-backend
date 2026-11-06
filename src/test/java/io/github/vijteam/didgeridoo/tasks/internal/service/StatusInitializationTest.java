@@ -23,6 +23,7 @@ import java.util.UUID;
 class StatusInitializationTest {
     @Autowired private StatusInitializer initializer;
     @Autowired private TaskCreationService creation;
+    @Autowired private TaskReadingService reading;
     @Autowired private TaskStatusRepository statuses;
     @Autowired private TransactionTemplate transaction;
 
@@ -82,6 +83,15 @@ class StatusInitializationTest {
                                 space,
                                 UUID.randomUUID(),
                                 new CreateTask("Task", null, null, null, null, null, false)));
+    }
+
+    @Test
+    void readingFailsClosedWithoutSpacesAdapter() {
+        UUID space = UUID.randomUUID();
+        UUID actor = UUID.randomUUID();
+        assertThrows(
+                IllegalStateException.class, () -> reading.get(space, actor, UUID.randomUUID()));
+        assertThrows(IllegalStateException.class, () -> reading.list(space, actor, 0, 20));
     }
 
     @Test
