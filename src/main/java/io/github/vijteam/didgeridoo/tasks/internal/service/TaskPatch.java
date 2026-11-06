@@ -1,5 +1,6 @@
 package io.github.vijteam.didgeridoo.tasks.internal.service;
 
+import io.github.vijteam.didgeridoo.tasks.internal.error.TaskValidationException;
 import io.github.vijteam.didgeridoo.tasks.internal.model.Task;
 import io.github.vijteam.didgeridoo.tasks.internal.model.TaskPriority;
 
@@ -18,7 +19,7 @@ public record TaskPatch(
                 && deadline == null
                 && priority == null
                 && assigneeCanEdit == null) {
-            throw new IllegalArgumentException("At least one field is required");
+            throw new TaskValidationException("At least one field is required");
         }
         requireNonNullValue(title, "title");
         requireNonNullValue(priority, "priority");
@@ -27,7 +28,7 @@ public record TaskPatch(
 
     private static void requireNonNullValue(Field<?> field, String name) {
         if (field != null && field.value() == null) {
-            throw new IllegalArgumentException(name + " cannot be null");
+            throw new TaskValidationException(name, name + " cannot be null");
         }
     }
 

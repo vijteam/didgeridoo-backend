@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 
 import io.github.vijteam.didgeridoo.TestcontainersConfiguration;
 import io.github.vijteam.didgeridoo.tasks.api.StatusInitializer;
+import io.github.vijteam.didgeridoo.tasks.internal.error.TaskValidationException;
 import io.github.vijteam.didgeridoo.tasks.internal.repository.TaskRepository;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -151,7 +152,8 @@ class TaskCreationTest {
         UUID guest = UUID.randomUUID();
         when(access.roleOf(space, actor)).thenReturn(TaskSpaceAccess.Role.OWNER);
         when(access.roleOf(space, guest)).thenReturn(TaskSpaceAccess.Role.GUEST);
-        assertThrows(SecurityException.class, () -> service.create(space, actor, command(guest)));
+        assertThrows(
+                TaskValidationException.class, () -> service.create(space, actor, command(guest)));
     }
 
     @Test

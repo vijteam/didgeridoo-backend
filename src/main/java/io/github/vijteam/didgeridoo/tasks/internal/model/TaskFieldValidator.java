@@ -1,5 +1,7 @@
 package io.github.vijteam.didgeridoo.tasks.internal.model;
 
+import io.github.vijteam.didgeridoo.tasks.internal.error.TaskValidationException;
+
 final class TaskFieldValidator {
     private TaskFieldValidator() {}
 
@@ -7,14 +9,14 @@ final class TaskFieldValidator {
         if (value == null
                 || value.isBlank()
                 || value.codePointCount(0, value.length()) > maxLength) {
-            throw new IllegalArgumentException("Invalid " + field);
+            throw new TaskValidationException(field, "Invalid " + field);
         }
         return value;
     }
 
     static <T> T required(T value, String field) {
         if (value == null) {
-            throw new IllegalArgumentException(field + " is required");
+            throw new TaskValidationException(field, field + " is required");
         }
         return value;
     }

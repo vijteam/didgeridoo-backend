@@ -1,5 +1,7 @@
 package io.github.vijteam.didgeridoo.tasks.internal.model;
 
+import io.github.vijteam.didgeridoo.tasks.internal.error.TaskValidationException;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -45,7 +47,7 @@ public class TaskStatus {
         this.spaceId = TaskFieldValidator.required(spaceId, "spaceId");
         this.kind = TaskFieldValidator.required(kind, "kind");
         if (position < 0) {
-            throw new IllegalArgumentException("Position must not be negative");
+            throw new TaskValidationException("position", "Position must not be negative");
         }
         this.position = position;
         this.name = TaskFieldValidator.text(name, 100, "status name");
