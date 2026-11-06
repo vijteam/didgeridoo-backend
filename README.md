@@ -12,6 +12,7 @@ Didgeridoo позволяет организовывать задачи в не�
 - Spring Boot
 - Spring Web MVC
 - Spring Data JPA / Hibernate
+- Spring Security
 - Jakarta Bean Validation
 - PostgreSQL
 - Flyway
