@@ -26,6 +26,8 @@ class StatusInitializationTest {
     @Autowired private TaskReadingService reading;
     @Autowired private TaskEditingService editing;
     @Autowired private TaskStatusChangeService statusChange;
+    @Autowired private TaskDeletionService deletion;
+    @Autowired private TaskHistoryService history;
     @Autowired private TaskStatusRepository statuses;
     @Autowired private TransactionTemplate transaction;
 
@@ -124,6 +126,15 @@ class StatusInitializationTest {
                                 UUID.randomUUID(),
                                 UUID.randomUUID(),
                                 UUID.randomUUID()));
+    }
+
+    @Test
+    void deletionAndHistoryFailClosedWithoutSpacesAdapter() {
+        UUID space = UUID.randomUUID();
+        UUID actor = UUID.randomUUID();
+        UUID task = UUID.randomUUID();
+        assertThrows(IllegalStateException.class, () -> deletion.delete(space, actor, task, true));
+        assertThrows(IllegalStateException.class, () -> history.list(space, actor, task, 0, 20));
     }
 
     @Test

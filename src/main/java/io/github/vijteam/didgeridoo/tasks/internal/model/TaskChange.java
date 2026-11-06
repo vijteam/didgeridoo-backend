@@ -97,6 +97,30 @@ public class TaskChange {
         return !changedFields.isEmpty();
     }
 
+    public UUID getId() {
+        return id;
+    }
+
+    public UUID getTaskId() {
+        return taskId;
+    }
+
+    public UUID getActorId() {
+        return actorId;
+    }
+
+    public String getKind() {
+        return kind;
+    }
+
+    public Map<String, Map<String, Object>> getChangedFields() {
+        return changedFields;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
     private void add(String field, Object value) {
         Map<String, Object> values = new LinkedHashMap<>();
         values.put("old", null);
