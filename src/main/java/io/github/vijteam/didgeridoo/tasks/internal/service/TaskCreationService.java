@@ -40,6 +40,11 @@ public class TaskCreationService {
 
     /** actorId must come from the authenticated caller, never from an untrusted request body. */
     public UUID create(UUID spaceId, UUID actorId, CreateTask command) {
+        return createView(spaceId, actorId, command).id();
+    }
+
+    /** Returns the created snapshot within the same transaction, without a second access check. */
+    public TaskView createView(UUID spaceId, UUID actorId, CreateTask command) {
         if (spaceId == null || actorId == null || command == null) {
             throw new TaskValidationException("spaceId, actorId and command are required");
         }
@@ -96,6 +101,6 @@ public class TaskCreationService {
         }
         tasks.saveAndFlush(task);
         changes.saveAndFlush(TaskChange.created(task, actorId));
-        return task.getId();
+        return TaskView.from(task);
     }
 }

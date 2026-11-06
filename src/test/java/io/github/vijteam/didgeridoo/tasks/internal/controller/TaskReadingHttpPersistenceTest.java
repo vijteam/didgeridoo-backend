@@ -26,7 +26,7 @@ import java.util.UUID;
 @Import(TestcontainersConfiguration.class)
 class TaskReadingHttpPersistenceTest {
     @Autowired private TaskReadingController controller;
-    @Autowired private TaskReadingExceptionHandler errors;
+    @Autowired private TaskHttpExceptionHandler errors;
     @Autowired private TaskCreationService creation;
     @Autowired private StatusInitializer initializer;
     @Autowired private JdbcTemplate jdbc;

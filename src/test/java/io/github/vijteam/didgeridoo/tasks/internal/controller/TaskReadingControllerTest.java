@@ -52,7 +52,7 @@ class TaskReadingControllerTest {
         mvc =
                 MockMvcBuilders.standaloneSetup(
                                 new TaskReadingController(reading, history, provider))
-                        .setControllerAdvice(new TaskReadingExceptionHandler())
+                        .setControllerAdvice(new TaskHttpExceptionHandler())
                         .build();
     }
 

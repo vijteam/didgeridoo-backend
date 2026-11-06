@@ -22,6 +22,7 @@ import java.util.UUID;
 @Import(TestcontainersConfiguration.class)
 class StatusInitializationTest {
     @Autowired private StatusInitializer initializer;
+    @Autowired private org.springframework.context.ApplicationContext context;
     @Autowired private TaskCreationService creation;
     @Autowired private TaskReadingService reading;
     @Autowired private TaskEditingService editing;
@@ -135,6 +136,15 @@ class StatusInitializationTest {
         UUID task = UUID.randomUUID();
         assertThrows(IllegalStateException.class, () -> deletion.delete(space, actor, task, true));
         assertThrows(IllegalStateException.class, () -> history.list(space, actor, task, 0, 20));
+    }
+
+    @Test
+    void writeHttpControllerIsDisabledByDefault() {
+        assertTrue(
+                context.getBeansOfType(
+                                io.github.vijteam.didgeridoo.tasks.internal.controller
+                                        .TaskWritingController.class)
+                        .isEmpty());
     }
 
     @Test

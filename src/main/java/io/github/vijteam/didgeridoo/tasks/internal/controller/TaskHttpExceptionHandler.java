@@ -11,9 +11,9 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
-/** Applies only to the tasks reading controller; does not configure shared infrastructure. */
-@RestControllerAdvice(assignableTypes = TaskReadingController.class)
-public class TaskReadingExceptionHandler {
+/** Applies only to tasks controllers; does not configure shared infrastructure. */
+@RestControllerAdvice(assignableTypes = {TaskReadingController.class, TaskWritingController.class})
+public class TaskHttpExceptionHandler {
     @ExceptionHandler(TaskAuthenticationException.class)
     public ResponseEntity<TaskApiError> unauthenticated() {
         return error(401, "UNAUTHENTICATED", "Authentication required");
@@ -24,6 +24,24 @@ public class TaskReadingExceptionHandler {
         return failure.getReason() == TaskAccessException.Reason.NOT_MEMBER
                 ? notFound()
                 : error(403, "FORBIDDEN", "Action is not allowed");
+    }
+
+    @ExceptionHandler(TaskCsrfException.class)
+    public ResponseEntity<TaskApiError> csrf() {
+        return error(403, "INVALID_CSRF_TOKEN", "CSRF token is invalid");
+    }
+
+    @ExceptionHandler({
+        TaskMalformedJsonException.class,
+        org.springframework.http.converter.HttpMessageNotReadableException.class
+    })
+    public ResponseEntity<TaskApiError> malformed() {
+        return error(400, "MALFORMED_JSON", "Malformed JSON request");
+    }
+
+    @ExceptionHandler(org.springframework.web.HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<TaskApiError> unsupportedMediaType() {
+        return error(415, "UNSUPPORTED_MEDIA_TYPE", "JSON content type is required");
     }
 
     @ExceptionHandler(TaskNotFoundException.class)
@@ -43,8 +61,8 @@ public class TaskReadingExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<TaskApiError> unexpected(Exception failure) {
-        org.slf4j.LoggerFactory.getLogger(TaskReadingExceptionHandler.class)
-                .error("Task reading request failed", failure);
+        org.slf4j.LoggerFactory.getLogger(TaskHttpExceptionHandler.class)
+                .error("Task HTTP request failed", failure);
         return error(500, "INTERNAL_ERROR", "Unable to process request");
     }
 
