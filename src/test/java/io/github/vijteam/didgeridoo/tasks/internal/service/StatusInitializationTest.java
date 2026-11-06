@@ -22,6 +22,7 @@ import java.util.UUID;
 @Import(TestcontainersConfiguration.class)
 class StatusInitializationTest {
     @Autowired private StatusInitializer initializer;
+    @Autowired private TaskCreationService creation;
     @Autowired private TaskStatusRepository statuses;
     @Autowired private TransactionTemplate transaction;
 
@@ -69,6 +70,18 @@ class StatusInitializationTest {
                                     throw new IllegalStateException("Workflow failed");
                                 }));
         assertTrue(statuses.findAllBySpaceIdOrderByPositionAsc(spaceId).isEmpty());
+    }
+
+    @Test
+    void creationFailsClosedWithoutSpacesAdapter() {
+        UUID space = UUID.randomUUID();
+        assertThrows(
+                IllegalStateException.class,
+                () ->
+                        creation.create(
+                                space,
+                                UUID.randomUUID(),
+                                new CreateTask("Task", null, null, null, null, null, false)));
     }
 
     @Test

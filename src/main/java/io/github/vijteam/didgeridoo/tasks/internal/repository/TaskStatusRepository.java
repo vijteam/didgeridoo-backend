@@ -10,6 +10,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface TaskStatusRepository extends JpaRepository<TaskStatus, UUID> {
+    Optional<TaskStatus> findByIdAndSpaceId(UUID id, UUID spaceId);
+
     Optional<TaskStatus> findFirstBySpaceIdAndKindOrderByPositionAsc(UUID spaceId, StatusKind kind);
 
     List<TaskStatus> findAllBySpaceIdOrderByPositionAsc(UUID spaceId);
