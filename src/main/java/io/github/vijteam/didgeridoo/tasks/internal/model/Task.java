@@ -1,20 +1,69 @@
 package io.github.vijteam.didgeridoo.tasks.internal.model;
 
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
 import java.time.Instant;
 import java.util.UUID;
 
 /** Local task invariants; services check membership and permissions before mutation. */
+@Entity
+@Table(name = "tasks")
 public class Task {
-    private final UUID spaceId;
-    private final UUID creatorId;
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
+
+    @CreationTimestamp
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private Instant createdAt;
+
+    @UpdateTimestamp
+    @Column(name = "updated_at", nullable = false)
+    private Instant updatedAt;
+
+    @Column(name = "space_id", nullable = false, updatable = false)
+    private UUID spaceId;
+
+    @Column(name = "creator_user_id", updatable = false)
+    private UUID creatorId;
+
+    @Column(name = "status_id", nullable = false)
     private UUID statusId;
+
+    @Column(nullable = false, length = 255)
     private String title;
+
+    @Column(columnDefinition = "text")
     private String description;
+
+    @Column(name = "deadline_at")
     private Instant deadline;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 16)
     private TaskPriority priority = TaskPriority.MEDIUM;
+
+    @Column(name = "assignee_can_edit", nullable = false)
     private boolean assigneeCanEdit;
+
+    @Column(name = "assignee_user_id")
     private UUID assigneeId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "assignment_source", length = 16)
     private AssignmentSource assignmentSource;
+
+    protected Task() {}
 
     public Task(UUID spaceId, UUID creatorId, UUID statusId, String title) {
         this.spaceId = TaskFieldValidator.required(spaceId, "spaceId");
@@ -52,6 +101,18 @@ public class Task {
     public void unassign() {
         this.assigneeId = null;
         this.assignmentSource = null;
+    }
+
+    public UUID getId() {
+        return id;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
+    public Instant getUpdatedAt() {
+        return updatedAt;
     }
 
     public UUID getSpaceId() {
