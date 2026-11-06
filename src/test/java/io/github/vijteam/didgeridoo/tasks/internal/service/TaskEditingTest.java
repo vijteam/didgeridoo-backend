@@ -27,6 +27,10 @@ import java.util.UUID;
 @Import(TestcontainersConfiguration.class)
 class TaskEditingTest {
     @Autowired private TaskEditingService editing;
+
+    @Autowired
+    private io.github.vijteam.didgeridoo.tasks.internal.controller.TaskRequestParser requests;
+
     @Autowired private TaskCreationService creation;
     @Autowired private TaskReadingService reading;
     @Autowired private StatusInitializer initializer;
@@ -366,5 +370,15 @@ class TaskEditingTest {
                                 task,
                                 new TaskPatch(null, null, TaskPatch.Field.of(null), null, null))
                         .deadline());
+    }
+
+    @Test
+    void parsedJsonPatchUpdatesOnlySuppliedFieldInPostgres() {
+        var before = reading.get(space, creator, task);
+        var after = editing.patch(space, creator, task, requests.patch("{\"description\":null}"));
+        assertEquals(null, after.description());
+        assertEquals(before.title(), after.title());
+        assertEquals(before.priority(), after.priority());
+        assertEquals(before.statusId(), after.statusId());
     }
 }
