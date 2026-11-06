@@ -10,6 +10,8 @@ import jakarta.persistence.Table;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import io.github.vijteam.didgeridoo.identity.internal.validation.UserFieldValidator;
+
 import java.time.Instant;
 import java.util.UUID;
 

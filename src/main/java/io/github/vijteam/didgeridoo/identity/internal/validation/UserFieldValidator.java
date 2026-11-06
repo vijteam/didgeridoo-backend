@@ -1,11 +1,11 @@
-package io.github.vijteam.didgeridoo.identity.internal.model;
+package io.github.vijteam.didgeridoo.identity.internal.validation;
 
 import java.text.Normalizer;
 import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-final class UserFieldValidator {
+public final class UserFieldValidator {
 
     private static final Pattern USERNAME_PATTERN =
             Pattern.compile("^[A-Za-z][A-Za-z0-9]*(?:[._-][A-Za-z0-9]+)*$");
@@ -23,7 +23,7 @@ final class UserFieldValidator {
 
     private UserFieldValidator() {}
 
-    static String username(String value) {
+    public static String username(String value) {
         if (value == null || value.length() < 3 || value.length() > 30) {
             throw new IllegalArgumentException("Invalid username length");
         }
@@ -39,7 +39,7 @@ final class UserFieldValidator {
         return value;
     }
 
-    static String displayName(String value) {
+    public static String displayName(String value) {
         if (value == null) {
             throw new IllegalArgumentException("Display name is required");
         }
@@ -66,7 +66,7 @@ final class UserFieldValidator {
         return normalized;
     }
 
-    static String email(String value) {
+    public static String email(String value) {
         if (value == null) {
             throw new IllegalArgumentException("Email is required");
         }
@@ -84,7 +84,7 @@ final class UserFieldValidator {
         return normalized;
     }
 
-    static String passwordHash(String value) {
+    public static String passwordHash(String value) {
         if (value == null || value.isBlank() || value.length() > 255) {
             throw new IllegalArgumentException("Invalid password hash");
         }
