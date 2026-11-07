@@ -53,7 +53,7 @@ class SpaceServiceTest {
                         });
 
         SpaceSummary result = service.createWithOwner(actorId, " Team ");
-        
+
         assertEquals(spaceId, result.id());
         assertEquals("Team", result.name());
         ArgumentCaptor<SpaceMembership> captured = ArgumentCaptor.forClass(SpaceMembership.class);

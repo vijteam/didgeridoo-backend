@@ -14,7 +14,7 @@ class SpaceTest {
     @Test
     void shouldTrimNameAndLeaveGeneratedFieldsUnset() {
         Space space = new Space("  Team space  ");
-    
+
         assertEquals("Team space", space.getName());
         assertNull(space.getId());
         assertNull(space.getCreatedAt());
@@ -24,18 +24,15 @@ class SpaceTest {
     @Test
     void shouldValidateNameLengthAfterTrimming() {
         String name = "  " + "a".repeat(150) + "  ";
-    
+
         Space space = new Space(name);
-    
+
         assertEquals("a".repeat(150), space.getName());
     }
 
     @Test
     void shouldRejectNameContainingOnlyWhitespace() {
-        assertThrows(
-            IllegalArgumentException.class,
-            () -> new Space("   ")
-        );
+        assertThrows(IllegalArgumentException.class, () -> new Space("   "));
     }
 
     @ParameterizedTest
