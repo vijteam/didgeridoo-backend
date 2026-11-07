@@ -12,13 +12,30 @@ import org.junit.jupiter.params.provider.ValueSource;
 class SpaceTest {
 
     @Test
-    void shouldPreserveNameAndLeaveGeneratedFieldsUnset() {
+    void shouldTrimNameAndLeaveGeneratedFieldsUnset() {
         Space space = new Space("  Team space  ");
-
-        assertEquals("  Team space  ", space.getName());
+    
+        assertEquals("Team space", space.getName());
         assertNull(space.getId());
         assertNull(space.getCreatedAt());
         assertNull(space.getUpdatedAt());
+    }
+
+    @Test
+    void shouldValidateNameLengthAfterTrimming() {
+        String name = "  " + "a".repeat(150) + "  ";
+    
+        Space space = new Space(name);
+    
+        assertEquals("a".repeat(150), space.getName());
+    }
+
+    @Test
+    void shouldRejectNameContainingOnlyWhitespace() {
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new Space("   ")
+        );
     }
 
     @ParameterizedTest
