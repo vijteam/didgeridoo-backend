@@ -61,7 +61,7 @@ class SpaceRepositoryTest {
 
         Space loaded = spaces.findById(space.getId()).orElseThrow();
         SpaceMembership loadedMembership = memberships.findById(key).orElseThrow();
-        assertEquals("  Project space  ", loaded.getName());
+        assertEquals("Project space", loaded.getName());
         assertNotNull(loaded.getCreatedAt());
         assertNotNull(loaded.getUpdatedAt());
         assertEquals(role, loadedMembership.getRole());
