@@ -35,7 +35,11 @@ public class Space {
     protected Space() {}
 
     public Space(String name) {
-        if (name == null || name.isBlank() || name.codePointCount(0, name.length()) > 150) {
+        if (name == null) {
+            throw new IllegalArgumentException("Space name must not be null");
+        }
+        name = name.trim();
+        if (name.isBlank() || name.codePointCount(0, name.length()) > 150) {
             throw new IllegalArgumentException("Space name must contain 1 to 150 characters");
         }
 
