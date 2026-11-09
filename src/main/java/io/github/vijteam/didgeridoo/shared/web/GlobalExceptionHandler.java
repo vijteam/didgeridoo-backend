@@ -19,39 +19,23 @@ import java.util.List;
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(ApplicationException.class)
-        public ResponseEntity<ApiError> handleApplication(ApplicationException ex) {
-            ApiError response = new ApiError(
-                    ex.getCode(),
-                    ex.getMessage()
-            );
+    public ResponseEntity<ApiError> handleApplication(ApplicationException ex) {
+        ApiError response = new ApiError(ex.getCode(), ex.getMessage());
 
-            return ResponseEntity
-                    .status(mapHttpStatus(ex.getCode()))
-                    .body(response);
-        }
+        return ResponseEntity.status(mapHttpStatus(ex.getCode())).body(response);
+    }
 
     @ExceptionHandler(FieldValidationException.class)
     public ResponseEntity<ApiError> handleFieldValidation(FieldValidationException ex) {
         List<ApiError.FieldErrorResponse> fieldErrors =
                 ex.getViolations().stream()
-                        .map(v -> new ApiError.FieldErrorResponse(
-                                v.field(),
-                                v.code(),
-                                v.message()
-                        ))
+                        .map(v -> new ApiError.FieldErrorResponse(v.field(), v.code(), v.message()))
                         .toList();
 
-        ApiError response = new ApiError(
-                ex.getCode(),
-                ex.getMessage(),
-                fieldErrors
-        );
+        ApiError response = new ApiError(ex.getCode(), ex.getMessage(), fieldErrors);
 
-        return ResponseEntity
-                .status(mapHttpStatus(ex.getCode()))
-                .body(response);
+        return ResponseEntity.status(mapHttpStatus(ex.getCode())).body(response);
     }
-
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiError> handleMethodArgumentNotValid(
@@ -70,21 +54,16 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ResponseEntity<ApiError> handleUnreadableMessage(
-            HttpMessageNotReadableException ex
-    ) {
-        ApiError response = new ApiError(
-                ApiErrorCode.MALFORMED_JSON,
-                "Invalid request body",
-                null
-        );
+    public ResponseEntity<ApiError> handleUnreadableMessage(HttpMessageNotReadableException ex) {
+        ApiError response = new ApiError(ApiErrorCode.MALFORMED_JSON, "Invalid request body", null);
 
         return ResponseEntity.badRequest().body(response);
     }
 
     private ResponseEntity<ApiError> validationError(
             List<ApiError.FieldErrorResponse> fieldErrors) {
-        ApiError response = new ApiError(ApiErrorCode.VALIDATION_FAILED, "Invalid request data", fieldErrors);
+        ApiError response =
+                new ApiError(ApiErrorCode.VALIDATION_FAILED, "Invalid request data", fieldErrors);
 
         return ResponseEntity.badRequest().body(response);
     }
@@ -114,9 +93,7 @@ public class GlobalExceptionHandler {
             return mapSizeCode(error);
         }
 
-        throw new IllegalStateException(
-                "Unmapped validation constraint: " + code
-        );
+        throw new IllegalStateException("Unmapped validation constraint: " + code);
     }
 
     private FieldErrorCode mapSizeCode(FieldError error) {
@@ -127,9 +104,7 @@ public class GlobalExceptionHandler {
                 || !(arguments[1] instanceof Integer max)
                 || !(arguments[2] instanceof Integer min)
                 || !(error.getRejectedValue() instanceof String value)) {
-            throw new IllegalStateException(
-                    "Cannot map Size constraint for: " + error.getField()
-            );
+            throw new IllegalStateException("Cannot map Size constraint for: " + error.getField());
         }
 
         if (value.length() < min) {
@@ -140,9 +115,7 @@ public class GlobalExceptionHandler {
             return FieldErrorCode.TOO_LONG;
         }
 
-        throw new IllegalStateException(
-                "Unexpected Size violation: " + error.getField()
-        );
+        throw new IllegalStateException("Unexpected Size violation: " + error.getField());
     }
 
     private HttpStatus mapHttpStatus(ApiErrorCode code) {
