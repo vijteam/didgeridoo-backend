@@ -7,6 +7,7 @@ public enum FieldErrorCode {
     TOO_SHORT,
     TOO_LONG,
     INVALID_FORMAT,
+    INVALID_REFERENCE,
     RESERVED,
     UNKNOWN_FIELD,
     COMPROMISED_PASSWORD,

@@ -13,6 +13,7 @@ public enum ApiErrorCode {
     // 403 Forbidden
     INVALID_CSRF_TOKEN,
     INVALID_CURRENT_PASSWORD,
+    FORBIDDEN,
 
     // 404 Not Found
     NOT_FOUND,
@@ -31,5 +32,6 @@ public enum ApiErrorCode {
     INTERNAL_ERROR,
 
     // 503 Service Unavailable
+    SERVICE_UNAVAILABLE,
     MEDIA_STORAGE_UNAVAILABLE
 }

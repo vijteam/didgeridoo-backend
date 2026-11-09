@@ -149,13 +149,13 @@ public class GlobalExceptionHandler {
         return switch (code) {
             case VALIDATION_FAILED, MALFORMED_JSON -> HttpStatus.BAD_REQUEST;
             case INVALID_CREDENTIALS, UNAUTHENTICATED -> HttpStatus.UNAUTHORIZED;
-            case INVALID_CSRF_TOKEN, INVALID_CURRENT_PASSWORD -> HttpStatus.FORBIDDEN;
+            case INVALID_CSRF_TOKEN, INVALID_CURRENT_PASSWORD, FORBIDDEN -> HttpStatus.FORBIDDEN;
             case NOT_FOUND -> HttpStatus.NOT_FOUND;
             case REGISTRATION_CONFLICT, USERNAME_UNAVAILABLE -> HttpStatus.CONFLICT;
             case PAYLOAD_TOO_LARGE -> HttpStatus.CONTENT_TOO_LARGE;
             case UNSUPPORTED_MEDIA_TYPE -> HttpStatus.UNSUPPORTED_MEDIA_TYPE;
             case INTERNAL_ERROR -> HttpStatus.INTERNAL_SERVER_ERROR;
-            case MEDIA_STORAGE_UNAVAILABLE -> HttpStatus.SERVICE_UNAVAILABLE;
+            case SERVICE_UNAVAILABLE, MEDIA_STORAGE_UNAVAILABLE -> HttpStatus.SERVICE_UNAVAILABLE;
         };
     }
 }
