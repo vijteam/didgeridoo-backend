@@ -8,7 +8,7 @@ Didgeridoo позволяет организовывать задачи в не�
 
 ## Технологии
 
-- Java 17
+- Java 25
 - Spring Boot
 - Spring Web MVC
 - Spring Data JPA / Hibernate
@@ -24,7 +24,7 @@ Didgeridoo позволяет организовывать задачи в не�
 
 ### Требования
 
-- JDK 17
+- JDK 25
 - Docker с поддержкой Docker Compose
 
 ### 1. Запуск базы данных
