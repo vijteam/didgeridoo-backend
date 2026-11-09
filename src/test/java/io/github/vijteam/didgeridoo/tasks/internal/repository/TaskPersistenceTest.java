@@ -178,12 +178,16 @@ class TaskPersistenceTest {
     }
 
     @Test
-    void shouldPersistWithoutCreatingSpacesModuleTables() {
+    void shouldPersistWithoutForeignKeysToSpacesModuleTables() {
         tasks.saveAndFlush(newTask());
-        assertNull(jdbc.queryForObject("SELECT to_regclass('public.spaces')::text", String.class));
-        assertNull(
+        assertEquals(
+                0L,
                 jdbc.queryForObject(
-                        "SELECT to_regclass('public.space_memberships')::text", String.class));
+                        "SELECT count(*) FROM pg_constraint"
+                                + " WHERE contype = 'f'"
+                                + " AND conrelid IN ('public.tasks'::regclass, 'public.task_statuses'::regclass)"
+                                + " AND confrelid IN ('public.spaces'::regclass, 'public.space_memberships'::regclass)",
+                        Long.class));
     }
 
     @Test
