@@ -1,4 +1,4 @@
-package io.github.vijteam.didgeridoo.workflows.internal.controller;
+package io.github.vijteam.didgeridoo.spaces.internal.controller;
 
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -15,7 +15,13 @@ public class SpaceSessionSecurity {
     @Bean
     @Order(10)
     SecurityFilterChain spaceSecurity(HttpSecurity http) throws Exception {
-        http.securityMatcher("/api/v1/spaces", "/api/v1/spaces/{spaceId}")
+        http.securityMatcher(
+                        "/api/v1/spaces",
+                        "/api/v1/spaces/{spaceId}",
+                        "/api/v1/spaces/{spaceId}/memberships",
+                        "/api/v1/spaces/{spaceId}/invitations",
+                        "/api/v1/invitations/{invitationId}",
+                        "/api/v1/users/me/invitations")
                 .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
                 .csrf(csrf -> {})
                 .requestCache(cache -> cache.disable())
