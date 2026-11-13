@@ -57,7 +57,7 @@ class TaskMigrationTest {
                 user);
         Flyway flyway = latestMigration();
         flyway.migrate();
-        assertEquals("5", flyway.info().current().getVersion().toString());
+        assertEquals("6", flyway.info().current().getVersion().toString());
         assertEquals(
                 user,
                 jdbc.queryForObject(

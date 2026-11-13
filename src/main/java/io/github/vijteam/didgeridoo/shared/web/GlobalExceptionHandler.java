@@ -133,7 +133,10 @@ public class GlobalExceptionHandler {
             case INVALID_CREDENTIALS, UNAUTHENTICATED -> HttpStatus.UNAUTHORIZED;
             case INVALID_CSRF_TOKEN, INVALID_CURRENT_PASSWORD, FORBIDDEN -> HttpStatus.FORBIDDEN;
             case NOT_FOUND -> HttpStatus.NOT_FOUND;
-            case IDEMPOTENCY_CONFLICT, REGISTRATION_CONFLICT, USERNAME_UNAVAILABLE ->
+            case INVITATION_CONFLICT,
+                    IDEMPOTENCY_CONFLICT,
+                    REGISTRATION_CONFLICT,
+                    USERNAME_UNAVAILABLE ->
                     HttpStatus.CONFLICT;
             case PAYLOAD_TOO_LARGE -> HttpStatus.CONTENT_TOO_LARGE;
             case UNSUPPORTED_MEDIA_TYPE -> HttpStatus.UNSUPPORTED_MEDIA_TYPE;
