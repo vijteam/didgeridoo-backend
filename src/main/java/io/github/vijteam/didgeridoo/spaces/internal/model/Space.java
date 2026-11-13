@@ -1,5 +1,7 @@
 package io.github.vijteam.didgeridoo.spaces.internal.model;
 
+import io.github.vijteam.didgeridoo.spaces.api.SpaceName;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -35,15 +37,7 @@ public class Space {
     protected Space() {}
 
     public Space(String name) {
-        if (name == null) {
-            throw new IllegalArgumentException("Space name must not be null");
-        }
-        name = name.trim();
-        if (name.isBlank() || name.codePointCount(0, name.length()) > 150) {
-            throw new IllegalArgumentException("Space name must contain 1 to 150 characters");
-        }
-
-        this.name = name;
+        this.name = new SpaceName(name).value();
     }
 
     public UUID getId() {

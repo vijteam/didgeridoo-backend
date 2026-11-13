@@ -60,6 +60,15 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(response);
     }
 
+    @ExceptionHandler(org.springframework.web.HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ApiError> handleUnsupportedMediaType() {
+        return ResponseEntity.status(415)
+                .body(
+                        new ApiError(
+                                ApiErrorCode.UNSUPPORTED_MEDIA_TYPE,
+                                "JSON content type is required"));
+    }
+
     private ResponseEntity<ApiError> validationError(
             List<ApiError.FieldErrorResponse> fieldErrors) {
         ApiError response =
@@ -124,7 +133,8 @@ public class GlobalExceptionHandler {
             case INVALID_CREDENTIALS, UNAUTHENTICATED -> HttpStatus.UNAUTHORIZED;
             case INVALID_CSRF_TOKEN, INVALID_CURRENT_PASSWORD, FORBIDDEN -> HttpStatus.FORBIDDEN;
             case NOT_FOUND -> HttpStatus.NOT_FOUND;
-            case REGISTRATION_CONFLICT, USERNAME_UNAVAILABLE -> HttpStatus.CONFLICT;
+            case IDEMPOTENCY_CONFLICT, REGISTRATION_CONFLICT, USERNAME_UNAVAILABLE ->
+                    HttpStatus.CONFLICT;
             case PAYLOAD_TOO_LARGE -> HttpStatus.CONTENT_TOO_LARGE;
             case UNSUPPORTED_MEDIA_TYPE -> HttpStatus.UNSUPPORTED_MEDIA_TYPE;
             case INTERNAL_ERROR -> HttpStatus.INTERNAL_SERVER_ERROR;
