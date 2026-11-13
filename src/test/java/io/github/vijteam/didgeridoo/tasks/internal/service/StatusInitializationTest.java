@@ -1,0 +1,154 @@
+package io.github.vijteam.didgeridoo.tasks.internal.service;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import io.github.vijteam.didgeridoo.TestcontainersConfiguration;
+import io.github.vijteam.didgeridoo.tasks.api.StatusInitializer;
+import io.github.vijteam.didgeridoo.tasks.internal.model.StatusKind;
+import io.github.vijteam.didgeridoo.tasks.internal.repository.TaskStatusRepository;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.transaction.support.TransactionTemplate;
+
+import java.util.UUID;
+
+@SpringBootTest
+@Import(TestcontainersConfiguration.class)
+class StatusInitializationTest {
+    @Autowired private StatusInitializer initializer;
+    @Autowired private org.springframework.context.ApplicationContext context;
+    @Autowired private TaskCreationService creation;
+    @Autowired private TaskReadingService reading;
+    @Autowired private TaskEditingService editing;
+    @Autowired private TaskStatusChangeService statusChange;
+    @Autowired private TaskDeletionService deletion;
+    @Autowired private TaskHistoryService history;
+    @Autowired private TaskStatusRepository statuses;
+    @Autowired private TransactionTemplate transaction;
+
+    @Test
+    void createsTwoOrderedStatuses() {
+        UUID spaceId = UUID.randomUUID();
+        initializer.initialize(spaceId);
+        var result = statuses.findAllBySpaceIdOrderByPositionAsc(spaceId);
+        assertEquals(2, result.size());
+        assertEquals(StatusKind.INITIAL, result.get(0).getKind());
+        assertEquals(StatusKind.FINAL, result.get(1).getKind());
+        assertNotEquals(result.get(0).getId(), result.get(1).getId());
+        assertTrue(result.stream().allMatch(status -> spaceId.equals(status.getSpaceId())));
+    }
+
+    @Test
+    void repeatedInitializationFailsWithoutChangingExistingStatuses() {
+        UUID spaceId = UUID.randomUUID();
+        initializer.initialize(spaceId);
+        var before =
+                statuses.findAllBySpaceIdOrderByPositionAsc(spaceId).stream()
+                        .map(s -> s.getId())
+                        .toList();
+        assertThrows(IllegalStateException.class, () -> initializer.initialize(spaceId));
+        assertEquals(
+                before,
+                statuses.findAllBySpaceIdOrderByPositionAsc(spaceId).stream()
+                        .map(s -> s.getId())
+                        .toList());
+    }
+
+    @Test
+    void joinsAndRollsBackWithCallingWorkflow() {
+        UUID spaceId = UUID.randomUUID();
+        assertThrows(
+                IllegalStateException.class,
+                () ->
+                        transaction.executeWithoutResult(
+                                tx -> {
+                                    initializer.initialize(spaceId);
+                                    assertEquals(
+                                            2,
+                                            statuses.findAllBySpaceIdOrderByPositionAsc(spaceId)
+                                                    .size());
+                                    throw new IllegalStateException("Workflow failed");
+                                }));
+        assertTrue(statuses.findAllBySpaceIdOrderByPositionAsc(spaceId).isEmpty());
+    }
+
+    @Test
+    void creationFailsClosedWithoutSpacesAdapter() {
+        UUID space = UUID.randomUUID();
+        assertThrows(
+                IllegalStateException.class,
+                () ->
+                        creation.create(
+                                space,
+                                UUID.randomUUID(),
+                                new CreateTask("Task", null, null, null, null, null, false)));
+    }
+
+    @Test
+    void readingFailsClosedWithoutSpacesAdapter() {
+        UUID space = UUID.randomUUID();
+        UUID actor = UUID.randomUUID();
+        assertThrows(
+                IllegalStateException.class, () -> reading.get(space, actor, UUID.randomUUID()));
+        assertThrows(IllegalStateException.class, () -> reading.list(space, actor, 0, 20));
+    }
+
+    @Test
+    void editingFailsClosedWithoutSpacesAdapter() {
+        assertThrows(
+                IllegalStateException.class,
+                () ->
+                        editing.edit(
+                                UUID.randomUUID(),
+                                UUID.randomUUID(),
+                                UUID.randomUUID(),
+                                new EditTask(
+                                        "Task",
+                                        null,
+                                        null,
+                                        io.github.vijteam.didgeridoo.tasks.internal.model
+                                                .TaskPriority.MEDIUM,
+                                        null)));
+    }
+
+    @Test
+    void statusChangeFailsClosedWithoutSpacesAdapter() {
+        assertThrows(
+                IllegalStateException.class,
+                () ->
+                        statusChange.change(
+                                UUID.randomUUID(),
+                                UUID.randomUUID(),
+                                UUID.randomUUID(),
+                                UUID.randomUUID()));
+    }
+
+    @Test
+    void deletionAndHistoryFailClosedWithoutSpacesAdapter() {
+        UUID space = UUID.randomUUID();
+        UUID actor = UUID.randomUUID();
+        UUID task = UUID.randomUUID();
+        assertThrows(IllegalStateException.class, () -> deletion.delete(space, actor, task, true));
+        assertThrows(IllegalStateException.class, () -> history.list(space, actor, task, 0, 20));
+    }
+
+    @Test
+    void writeHttpControllerIsDisabledByDefault() {
+        assertTrue(
+                context.getBeansOfType(
+                                io.github.vijteam.didgeridoo.tasks.internal.controller
+                                        .TaskWritingController.class)
+                        .isEmpty());
+    }
+
+    @Test
+    void rejectsNullSpace() {
+        assertThrows(IllegalArgumentException.class, () -> initializer.initialize(null));
+    }
+}
