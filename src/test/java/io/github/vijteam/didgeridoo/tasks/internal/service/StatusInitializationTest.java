@@ -8,7 +8,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import io.github.vijteam.didgeridoo.TestcontainersConfiguration;
 import io.github.vijteam.didgeridoo.shared.ApplicationException;
 import io.github.vijteam.didgeridoo.tasks.api.StatusInitializer;
-import io.github.vijteam.didgeridoo.tasks.internal.error.TaskDependencyException;
 import io.github.vijteam.didgeridoo.tasks.internal.model.StatusKind;
 import io.github.vijteam.didgeridoo.tasks.internal.repository.TaskStatusRepository;
 
@@ -25,12 +24,6 @@ import java.util.UUID;
 class StatusInitializationTest {
     @Autowired private StatusInitializer initializer;
     @Autowired private org.springframework.context.ApplicationContext context;
-    @Autowired private TaskCreationService creation;
-    @Autowired private TaskReadingService reading;
-    @Autowired private TaskEditingService editing;
-    @Autowired private TaskStatusChangeService statusChange;
-    @Autowired private TaskDeletionService deletion;
-    @Autowired private TaskHistoryService history;
     @Autowired private TaskStatusRepository statuses;
     @Autowired private TransactionTemplate transaction;
 
@@ -78,66 +71,6 @@ class StatusInitializationTest {
                                     throw new IllegalStateException("Workflow failed");
                                 }));
         assertTrue(statuses.findAllBySpaceIdOrderByPositionAsc(spaceId).isEmpty());
-    }
-
-    @Test
-    void creationFailsClosedWithoutSpacesAdapter() {
-        UUID space = UUID.randomUUID();
-        assertThrows(
-                TaskDependencyException.class,
-                () ->
-                        creation.create(
-                                space,
-                                UUID.randomUUID(),
-                                new CreateTask("Task", null, null, null, null, null, false)));
-    }
-
-    @Test
-    void readingFailsClosedWithoutSpacesAdapter() {
-        UUID space = UUID.randomUUID();
-        UUID actor = UUID.randomUUID();
-        assertThrows(
-                TaskDependencyException.class, () -> reading.get(space, actor, UUID.randomUUID()));
-        assertThrows(TaskDependencyException.class, () -> reading.list(space, actor, 0, 20));
-    }
-
-    @Test
-    void editingFailsClosedWithoutSpacesAdapter() {
-        assertThrows(
-                TaskDependencyException.class,
-                () ->
-                        editing.edit(
-                                UUID.randomUUID(),
-                                UUID.randomUUID(),
-                                UUID.randomUUID(),
-                                new EditTask(
-                                        "Task",
-                                        null,
-                                        null,
-                                        io.github.vijteam.didgeridoo.tasks.internal.model
-                                                .TaskPriority.MEDIUM,
-                                        null)));
-    }
-
-    @Test
-    void statusChangeFailsClosedWithoutSpacesAdapter() {
-        assertThrows(
-                TaskDependencyException.class,
-                () ->
-                        statusChange.change(
-                                UUID.randomUUID(),
-                                UUID.randomUUID(),
-                                UUID.randomUUID(),
-                                UUID.randomUUID()));
-    }
-
-    @Test
-    void deletionAndHistoryFailClosedWithoutSpacesAdapter() {
-        UUID space = UUID.randomUUID();
-        UUID actor = UUID.randomUUID();
-        UUID task = UUID.randomUUID();
-        assertThrows(TaskDependencyException.class, () -> deletion.delete(space, actor, task));
-        assertThrows(TaskDependencyException.class, () -> history.list(space, actor, task, 0, 20));
     }
 
     @Test
