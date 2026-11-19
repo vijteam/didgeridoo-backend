@@ -6,7 +6,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.vijteam.didgeridoo.TestcontainersConfiguration;
+import io.github.vijteam.didgeridoo.shared.ApplicationException;
 import io.github.vijteam.didgeridoo.tasks.api.StatusInitializer;
+import io.github.vijteam.didgeridoo.tasks.internal.error.TaskDependencyException;
 import io.github.vijteam.didgeridoo.tasks.internal.model.StatusKind;
 import io.github.vijteam.didgeridoo.tasks.internal.repository.TaskStatusRepository;
 
@@ -82,7 +84,7 @@ class StatusInitializationTest {
     void creationFailsClosedWithoutSpacesAdapter() {
         UUID space = UUID.randomUUID();
         assertThrows(
-                IllegalStateException.class,
+                TaskDependencyException.class,
                 () ->
                         creation.create(
                                 space,
@@ -95,14 +97,14 @@ class StatusInitializationTest {
         UUID space = UUID.randomUUID();
         UUID actor = UUID.randomUUID();
         assertThrows(
-                IllegalStateException.class, () -> reading.get(space, actor, UUID.randomUUID()));
-        assertThrows(IllegalStateException.class, () -> reading.list(space, actor, 0, 20));
+                TaskDependencyException.class, () -> reading.get(space, actor, UUID.randomUUID()));
+        assertThrows(TaskDependencyException.class, () -> reading.list(space, actor, 0, 20));
     }
 
     @Test
     void editingFailsClosedWithoutSpacesAdapter() {
         assertThrows(
-                IllegalStateException.class,
+                TaskDependencyException.class,
                 () ->
                         editing.edit(
                                 UUID.randomUUID(),
@@ -120,7 +122,7 @@ class StatusInitializationTest {
     @Test
     void statusChangeFailsClosedWithoutSpacesAdapter() {
         assertThrows(
-                IllegalStateException.class,
+                TaskDependencyException.class,
                 () ->
                         statusChange.change(
                                 UUID.randomUUID(),
@@ -134,8 +136,8 @@ class StatusInitializationTest {
         UUID space = UUID.randomUUID();
         UUID actor = UUID.randomUUID();
         UUID task = UUID.randomUUID();
-        assertThrows(IllegalStateException.class, () -> deletion.delete(space, actor, task, true));
-        assertThrows(IllegalStateException.class, () -> history.list(space, actor, task, 0, 20));
+        assertThrows(TaskDependencyException.class, () -> deletion.delete(space, actor, task));
+        assertThrows(TaskDependencyException.class, () -> history.list(space, actor, task, 0, 20));
     }
 
     @Test
@@ -149,6 +151,6 @@ class StatusInitializationTest {
 
     @Test
     void rejectsNullSpace() {
-        assertThrows(IllegalArgumentException.class, () -> initializer.initialize(null));
+        assertThrows(ApplicationException.class, () -> initializer.initialize(null));
     }
 }

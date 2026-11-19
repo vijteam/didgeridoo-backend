@@ -1,5 +1,7 @@
 package io.github.vijteam.didgeridoo.tasks.internal.controller;
 
+import io.github.vijteam.didgeridoo.shared.FieldErrorCode;
+import io.github.vijteam.didgeridoo.shared.FieldValidationException;
 import io.github.vijteam.didgeridoo.tasks.internal.dto.TaskPageResponse;
 import io.github.vijteam.didgeridoo.tasks.internal.error.TaskDependencyException;
 import io.github.vijteam.didgeridoo.tasks.internal.error.TaskValidationException;
@@ -99,8 +101,10 @@ public class TaskReadingController {
         query.forEach(
                 (field, values) -> {
                     if (!allowed.contains(field) || values.size() != 1 || values.get(0).isBlank()) {
-                        throw new TaskValidationException(
-                                field, "Unknown, empty or repeated query parameter");
+                        throw new FieldValidationException(
+                                field,
+                                FieldErrorCode.INVALID_FORMAT,
+                                "Unknown, empty or repeated query parameter");
                     }
                 });
     }

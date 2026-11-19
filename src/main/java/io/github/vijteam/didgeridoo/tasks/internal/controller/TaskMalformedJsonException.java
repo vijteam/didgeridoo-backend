@@ -1,10 +1,10 @@
 package io.github.vijteam.didgeridoo.tasks.internal.controller;
 
-import io.github.vijteam.didgeridoo.tasks.internal.error.TaskValidationException;
+import io.github.vijteam.didgeridoo.shared.ApiErrorCode;
+import io.github.vijteam.didgeridoo.shared.ApplicationException;
 
-/** Distinguishes syntax/duplicate-key failures without exposing input or parser details. */
-public class TaskMalformedJsonException extends TaskValidationException {
+public class TaskMalformedJsonException extends ApplicationException {
     public TaskMalformedJsonException() {
-        super("Malformed JSON request");
+        super(ApiErrorCode.MALFORMED_JSON, "Malformed JSON request");
     }
 }

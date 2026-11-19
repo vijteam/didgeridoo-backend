@@ -9,8 +9,9 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 
 import io.github.vijteam.didgeridoo.TestcontainersConfiguration;
+import io.github.vijteam.didgeridoo.shared.ApplicationException;
 import io.github.vijteam.didgeridoo.tasks.api.StatusInitializer;
-import io.github.vijteam.didgeridoo.tasks.internal.error.TaskValidationException;
+import io.github.vijteam.didgeridoo.tasks.internal.error.TaskAccessException;
 import io.github.vijteam.didgeridoo.tasks.internal.repository.TaskRepository;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -99,16 +100,16 @@ class TaskCreationTest {
         UUID id = service.create(space, actor, command(actor));
         assertEquals(actor, tasks.findById(id).orElseThrow().getAssigneeId());
         assertThrows(
-                SecurityException.class,
+                TaskAccessException.class,
                 () -> service.create(space, actor, command(UUID.randomUUID())));
     }
 
     @Test
     void guestAndOutsiderCannotCreate() {
         when(access.roleOf(space, actor)).thenReturn(TaskSpaceAccess.Role.GUEST);
-        assertThrows(SecurityException.class, () -> service.create(space, actor, command(null)));
+        assertThrows(TaskAccessException.class, () -> service.create(space, actor, command(null)));
         when(access.roleOf(space, actor)).thenReturn(null);
-        assertThrows(SecurityException.class, () -> service.create(space, actor, command(null)));
+        assertThrows(TaskAccessException.class, () -> service.create(space, actor, command(null)));
         assertTrue(tasks.findAllBySpaceIdOrderByCreatedAtAscIdAsc(space).isEmpty());
     }
 
@@ -153,7 +154,7 @@ class TaskCreationTest {
         when(access.roleOf(space, actor)).thenReturn(TaskSpaceAccess.Role.OWNER);
         when(access.roleOf(space, guest)).thenReturn(TaskSpaceAccess.Role.GUEST);
         assertThrows(
-                TaskValidationException.class, () -> service.create(space, actor, command(guest)));
+                ApplicationException.class, () -> service.create(space, actor, command(guest)));
     }
 
     @Test
@@ -166,7 +167,7 @@ class TaskCreationTest {
                         UUID.class,
                         other);
         assertThrows(
-                IllegalArgumentException.class,
+                ApplicationException.class,
                 () ->
                         service.create(
                                 space,

@@ -1,10 +1,11 @@
 package io.github.vijteam.didgeridoo.tasks.internal.service;
 
+import io.github.vijteam.didgeridoo.shared.FieldErrorCode;
+import io.github.vijteam.didgeridoo.shared.FieldValidationException;
 import io.github.vijteam.didgeridoo.tasks.internal.error.TaskAccessException;
 import io.github.vijteam.didgeridoo.tasks.internal.error.TaskDependencyException;
 import io.github.vijteam.didgeridoo.tasks.internal.error.TaskValidationException;
 import io.github.vijteam.didgeridoo.tasks.internal.model.AssignmentSource;
-import io.github.vijteam.didgeridoo.tasks.internal.model.StatusKind;
 import io.github.vijteam.didgeridoo.tasks.internal.model.Task;
 import io.github.vijteam.didgeridoo.tasks.internal.model.TaskChange;
 import io.github.vijteam.didgeridoo.tasks.internal.model.TaskPriority;
@@ -69,14 +70,15 @@ public class TaskCreationService {
             TaskSpaceAccess.Role assigneeRole = membership.roleOf(spaceId, command.assigneeId());
             if (assigneeRole != TaskSpaceAccess.Role.OWNER
                     && assigneeRole != TaskSpaceAccess.Role.MEMBER) {
-                throw new TaskValidationException(
-                        "assigneeId", "Assignee must be a member or owner");
+                throw new FieldValidationException(
+                        "assigneeId",
+                        FieldErrorCode.INVALID_REFERENCE,
+                        "Assignee must be a member or owner");
             }
         }
         TaskStatus status =
                 command.statusId() == null
-                        ? statuses.findFirstBySpaceIdAndKindOrderByPositionAsc(
-                                        spaceId, StatusKind.INITIAL)
+                        ? statuses.findFirstBySpaceIdOrderByPositionAsc(spaceId)
                                 .orElseThrow(
                                         () ->
                                                 new TaskDependencyException(
@@ -86,8 +88,9 @@ public class TaskCreationService {
                         : statuses.findByIdAndSpaceId(command.statusId(), spaceId)
                                 .orElseThrow(
                                         () ->
-                                                new TaskValidationException(
+                                                new FieldValidationException(
                                                         "statusId",
+                                                        FieldErrorCode.INVALID_REFERENCE,
                                                         "Status does not belong to this space"));
         Task task = new Task(spaceId, actorId, status.getId(), command.title());
         task.updateDetails(

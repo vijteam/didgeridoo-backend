@@ -3,6 +3,8 @@ package io.github.vijteam.didgeridoo.tasks.internal.model;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import io.github.vijteam.didgeridoo.shared.ApplicationException;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
@@ -28,25 +30,25 @@ class TaskStatusTest {
     @ValueSource(strings = {" ", "\t\n"})
     void shouldRejectBlankStatusName(String name) {
         assertThrows(
-                IllegalArgumentException.class,
+                ApplicationException.class,
                 () -> new TaskStatus(spaceId, name, StatusKind.INITIAL, 0));
     }
 
     @Test
     void shouldEnforceStatusNameLengthAndPreserveNameOnFailure() {
         TaskStatus status = new TaskStatus(spaceId, "🚀".repeat(100), StatusKind.INITIAL, 0);
-        assertThrows(IllegalArgumentException.class, () -> status.rename("🚀".repeat(101)));
+        assertThrows(ApplicationException.class, () -> status.rename("🚀".repeat(101)));
         assertEquals("🚀".repeat(100), status.getName());
     }
 
     @Test
     void shouldRequireSpaceKindAndNonnegativePosition() {
         assertThrows(
-                IllegalArgumentException.class,
+                ApplicationException.class,
                 () -> new TaskStatus(null, "New", StatusKind.INITIAL, 0));
-        assertThrows(IllegalArgumentException.class, () -> new TaskStatus(spaceId, "New", null, 0));
+        assertThrows(ApplicationException.class, () -> new TaskStatus(spaceId, "New", null, 0));
         assertThrows(
-                IllegalArgumentException.class,
+                ApplicationException.class,
                 () -> new TaskStatus(spaceId, "New", StatusKind.INITIAL, -1));
     }
 }
