@@ -46,13 +46,6 @@ public class JdbcInvitationStore implements InvitationStore {
     }
 
     @Override
-    public boolean lockSpace(UUID spaceId) {
-        return !jdbc.queryForList(
-                        "SELECT id FROM spaces WHERE id=? FOR UPDATE", UUID.class, spaceId)
-                .isEmpty();
-    }
-
-    @Override
     public Optional<SpaceInvitation> findByRequest(UUID actorId, UUID requestId) {
         return jdbc
                 .query(

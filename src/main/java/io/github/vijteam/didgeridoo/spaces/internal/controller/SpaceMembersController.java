@@ -2,6 +2,7 @@ package io.github.vijteam.didgeridoo.spaces.internal.controller;
 
 import io.github.vijteam.didgeridoo.spaces.api.*;
 
+import org.springframework.http.MediaType;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.*;
 
@@ -28,5 +29,20 @@ public class SpaceMembersController {
             @RequestParam MultiValueMap<String, String> query) {
         var actor = actors.requireUser(principal);
         return members.list(actor, parser.uuid(spaceId, "spaceId"), parser.page(query));
+    }
+
+    @PatchMapping(path = "/{userId}", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public SpaceMemberSummary changeRole(
+            Principal principal,
+            @PathVariable String spaceId,
+            @PathVariable String userId,
+            @RequestBody String body,
+            @RequestParam MultiValueMap<String, String> query) {
+        var actor = actors.requireUser(principal);
+        return members.changeRole(
+                actor,
+                parser.uuid(spaceId, "spaceId"),
+                parser.uuid(userId, "userId"),
+                parser.membershipRole(body, query));
     }
 }

@@ -66,15 +66,21 @@ public class SpaceApiParser {
                 || username.length() > 30) {
             throw invalid("username", "Invalid username");
         }
-        SpaceRole role = SpaceRole.MEMBER;
-        if (json.has("role")) {
-            try {
-                role = SpaceRole.valueOf(string(json, "role"));
-            } catch (IllegalArgumentException ex) {
-                throw invalid("role", "Invalid role");
-            }
-        }
+        SpaceRole role = json.has("role") ? role(json) : SpaceRole.MEMBER;
         return new InvitationRequest(requestId, username, role);
+    }
+
+    public SpaceRole membershipRole(String body, MultiValueMap<String, String> query) {
+        noQuery(query);
+        return role(object(body, Set.of("role")));
+    }
+
+    private SpaceRole role(JsonNode json) {
+        try {
+            return SpaceRole.valueOf(string(json, "role"));
+        } catch (IllegalArgumentException ex) {
+            throw invalid("role", "Invalid role");
+        }
     }
 
     public InvitationState decision(String body, MultiValueMap<String, String> query) {
