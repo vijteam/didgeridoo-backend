@@ -16,8 +16,6 @@ public interface InvitationStore {
 
     void lockRequest(UUID actorId, UUID requestId);
 
-    boolean lockSpace(UUID spaceId);
-
     Optional<SpaceInvitation> findByRequest(UUID actorId, UUID requestId);
 
     Optional<SpaceInvitation> find(UUID invitationId);

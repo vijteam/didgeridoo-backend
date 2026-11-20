@@ -6,6 +6,7 @@ import io.github.vijteam.didgeridoo.shared.ApplicationException;
 import io.github.vijteam.didgeridoo.shared.FieldErrorCode;
 import io.github.vijteam.didgeridoo.shared.FieldValidationException;
 import io.github.vijteam.didgeridoo.spaces.api.*;
+import io.github.vijteam.didgeridoo.spaces.internal.repository.SpaceRepository;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
@@ -18,18 +19,24 @@ public class SpaceInvitationService {
     private final InvitationStore store;
     private final SpaceAccess access;
     private final UserDirectory users;
+    private final SpaceRepository spaces;
 
-    public SpaceInvitationService(InvitationStore store, SpaceAccess access, UserDirectory users) {
+    public SpaceInvitationService(
+            InvitationStore store,
+            SpaceAccess access,
+            UserDirectory users,
+            SpaceRepository spaces) {
         this.store = store;
         this.access = access;
         this.users = users;
+        this.spaces = spaces;
     }
 
     @Transactional
     public SpaceInvitation create(
             UUID actorId, UUID spaceId, UUID requestId, String username, SpaceRole role) {
         store.lockRequest(actorId, requestId);
-        lockSpace(spaceId);
+        spaces.lockById(spaceId).orElseThrow(SpaceNotFoundException::new);
         access.requireOwner(spaceId, actorId);
         UUID target =
                 users.findByUsername(username)
@@ -64,7 +71,7 @@ public class SpaceInvitationService {
         }
         SpaceInvitation snapshot =
                 store.find(invitationId).orElseThrow(SpaceNotFoundException::new);
-        lockSpace(snapshot.spaceId());
+        spaces.lockById(snapshot.spaceId()).orElseThrow(SpaceNotFoundException::new);
         SpaceInvitation invitation =
                 store.lock(invitationId).orElseThrow(SpaceNotFoundException::new);
         requireVisible(invitation, actorId);
@@ -107,12 +114,6 @@ public class SpaceInvitationService {
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public InvitationStore.Page forRecipient(UUID actorId, SpacePageWindow window) {
         return store.forRecipient(actorId, window);
-    }
-
-    private void lockSpace(UUID spaceId) {
-        if (!store.lockSpace(spaceId)) {
-            throw new SpaceNotFoundException();
-        }
     }
 
     private void requireVisible(SpaceInvitation invitation, UUID actorId) {

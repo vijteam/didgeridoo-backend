@@ -14,6 +14,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
+import java.util.Objects;
 import java.util.UUID;
 
 @Entity
@@ -48,6 +49,10 @@ public class SpaceMembership {
 
     public SpaceRole getRole() {
         return role;
+    }
+
+    public void changeRole(SpaceRole role) {
+        this.role = Objects.requireNonNull(role, "Space role is required");
     }
 
     public Instant getJoinedAt() {

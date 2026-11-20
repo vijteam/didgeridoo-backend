@@ -136,7 +136,9 @@ public class GlobalExceptionHandler {
             case INVITATION_CONFLICT,
                     IDEMPOTENCY_CONFLICT,
                     REGISTRATION_CONFLICT,
-                    USERNAME_UNAVAILABLE ->
+                    USERNAME_UNAVAILABLE,
+                    LAST_OWNER,
+                    MEMBERSHIP_CHANGE_UNAVAILABLE ->
                     HttpStatus.CONFLICT;
             case PAYLOAD_TOO_LARGE -> HttpStatus.CONTENT_TOO_LARGE;
             case UNSUPPORTED_MEDIA_TYPE -> HttpStatus.UNSUPPORTED_MEDIA_TYPE;

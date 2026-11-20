@@ -19,6 +19,9 @@ public class SpaceSessionSecurity {
                         "/api/v1/spaces",
                         "/api/v1/spaces/{spaceId}",
                         "/api/v1/spaces/{spaceId}/memberships",
+                        "/api/v1/spaces/{spaceId}/memberships/{userId}",
+                        "/api/v1/spaces/{spaceId}/analytics",
+                        "/api/v1/spaces/{spaceId}/memberships/{userId}/analytics",
                         "/api/v1/spaces/{spaceId}/invitations",
                         "/api/v1/invitations/{invitationId}",
                         "/api/v1/users/me/invitations")

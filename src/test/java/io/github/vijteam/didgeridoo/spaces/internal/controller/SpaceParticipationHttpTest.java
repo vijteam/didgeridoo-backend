@@ -1,5 +1,6 @@
 package io.github.vijteam.didgeridoo.spaces.internal.controller;
 
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -28,11 +29,13 @@ import org.springframework.security.web.context.HttpSessionSecurityContextReposi
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.context.WebApplicationContext;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.*;
@@ -44,6 +47,7 @@ class SpaceParticipationHttpTest {
     @Autowired UserRepository users;
     @Autowired JdbcTemplate jdbc;
     @Autowired TaskAssignmentService assignments;
+    @Autowired TransactionTemplate transaction;
     MockMvc mvc;
     User owner;
     User recipient;
@@ -161,6 +165,19 @@ class SpaceParticipationHttpTest {
                 user.getId());
     }
 
+    private String membershipPath(User target) {
+        return "/api/v1/spaces/" + space + "/memberships/" + target.getId();
+    }
+
+    private ResultActions changeRole(User actor, User target, SpaceRole role) throws Exception {
+        return mvc.perform(
+                patch(membershipPath(target))
+                        .session(login(actor))
+                        .with(csrf().asHeader())
+                        .contentType("application/json")
+                        .content("{\"role\":\"" + role + "\"}"));
+    }
+
     @Test
     void invitationAcceptanceEnablesClaimAndRecordsTheRecipientInHistory() throws Exception {
         String invitationId = invitation(recipient).get("id").asString();
@@ -193,6 +210,130 @@ class SpaceParticipationHttpTest {
         var released = assignments.release(space, recipient.getId(), taskId);
         assertNull(released.assigneeId());
         assertNull(released.assignmentSource());
+    }
+
+    @Test
+    void changesEligibleRolesAndProtectsMembershipWithRoleChecksAndCsrf() throws Exception {
+        member(recipient, space, "MEMBER");
+        member(guest, space, "GUEST");
+        member(outsider, otherSpace, "MEMBER");
+        var roleRequest =
+                patch(membershipPath(guest))
+                        .contentType("application/json")
+                        .content("{\"role\":\"MEMBER\"}");
+        mvc.perform(roleRequest.with(csrf().asHeader())).andExpect(status().isUnauthorized());
+        mvc.perform(
+                        patch(membershipPath(guest))
+                                .session(login(owner))
+                                .contentType("application/json")
+                                .content("{\"role\":\"MEMBER\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("INVALID_CSRF_TOKEN"));
+        changeRole(outsider, guest, SpaceRole.MEMBER).andExpect(status().isNotFound());
+        changeRole(owner, outsider, SpaceRole.OWNER).andExpect(status().isNotFound());
+        changeRole(recipient, guest, SpaceRole.MEMBER).andExpect(status().isForbidden());
+        changeRole(owner, owner, SpaceRole.MEMBER)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("LAST_OWNER"));
+        changeRole(owner, recipient, SpaceRole.GUEST)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("MEMBERSHIP_CHANGE_UNAVAILABLE"));
+        changeRole(owner, guest, SpaceRole.MEMBER)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userId").value(guest.getId().toString()))
+                .andExpect(jsonPath("$.role").value("MEMBER"))
+                .andExpect(jsonPath("$.email").doesNotExist());
+        changeRole(owner, guest, SpaceRole.MEMBER).andExpect(status().isOk());
+        changeRole(owner, guest, SpaceRole.OWNER).andExpect(status().isOk());
+        changeRole(guest, owner, SpaceRole.MEMBER).andExpect(status().isOk());
+        changeRole(owner, recipient, SpaceRole.OWNER).andExpect(status().isForbidden());
+    }
+
+    @Test
+    void validatesRoleChangesWithoutChangingMembership() throws Exception {
+        member(recipient, space, "MEMBER");
+        for (String invalid :
+                List.of(
+                        "{}",
+                        "{\"role\":null}",
+                        "{\"role\":\"ADMIN\"}",
+                        "{\"role\":\"MEMBER\",\"role\":\"OWNER\"}",
+                        "{\"role\":\"OWNER\",\"userId\":\"override\"}")) {
+            mvc.perform(
+                            patch(membershipPath(recipient))
+                                    .session(login(owner))
+                                    .with(csrf().asHeader())
+                                    .contentType("application/json")
+                                    .content(invalid))
+                    .andExpect(status().isBadRequest());
+        }
+        mvc.perform(
+                        patch(membershipPath(recipient))
+                                .session(login(owner))
+                                .with(csrf().asHeader())
+                                .contentType("text/plain")
+                                .content("{\"role\":\"OWNER\"}"))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(jsonPath("$.code").value("UNSUPPORTED_MEDIA_TYPE"));
+        assertEquals(
+                "MEMBER",
+                jdbc.queryForObject(
+                        "SELECT role FROM space_memberships WHERE space_id=? AND user_id=?",
+                        String.class,
+                        space,
+                        recipient.getId()));
+    }
+
+    @Test
+    void concurrentOwnerDemotionsRetainOneOwner() throws Exception {
+        member(recipient, space, "OWNER");
+        try (var executor = Executors.newSingleThreadExecutor()) {
+            var second =
+                    transaction.execute(
+                            transactionStatus -> {
+                                assertDoesNotThrow(
+                                        () ->
+                                                changeRole(owner, owner, SpaceRole.MEMBER)
+                                                        .andExpect(status().isOk()));
+                                int blocker =
+                                        jdbc.queryForObject(
+                                                "SELECT pg_backend_pid()", Integer.class);
+                                var pending =
+                                        executor.submit(
+                                                () ->
+                                                        changeRole(
+                                                                recipient,
+                                                                recipient,
+                                                                SpaceRole.MEMBER));
+                                awaitRequestBlockedBy(blocker);
+                                return pending;
+                            });
+            second.get(20, TimeUnit.SECONDS)
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.code").value("LAST_OWNER"));
+        }
+        assertEquals(
+                1,
+                jdbc.queryForObject(
+                        "SELECT count(*) FROM space_memberships WHERE space_id=? AND role='OWNER'",
+                        Integer.class,
+                        space));
+    }
+
+    private void awaitRequestBlockedBy(int backendPid) {
+        String query =
+                """
+                SELECT EXISTS (
+                    SELECT 1 FROM pg_stat_activity
+                    WHERE ? = ANY(pg_blocking_pids(pid))
+                )
+                """;
+        await().pollInSameThread()
+                .atMost(Duration.ofSeconds(10))
+                .until(
+                        () ->
+                                Boolean.TRUE.equals(
+                                        jdbc.queryForObject(query, Boolean.class, backendPid)));
     }
 
     @Test
