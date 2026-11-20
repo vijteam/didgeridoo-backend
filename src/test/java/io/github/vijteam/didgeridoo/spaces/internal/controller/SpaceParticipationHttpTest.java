@@ -10,6 +10,9 @@ import io.github.vijteam.didgeridoo.TestcontainersConfiguration;
 import io.github.vijteam.didgeridoo.identity.internal.model.User;
 import io.github.vijteam.didgeridoo.identity.internal.repository.UserRepository;
 import io.github.vijteam.didgeridoo.spaces.api.SpaceRole;
+import io.github.vijteam.didgeridoo.tasks.internal.error.TaskAccessException;
+import io.github.vijteam.didgeridoo.tasks.internal.model.AssignmentSource;
+import io.github.vijteam.didgeridoo.tasks.internal.service.TaskAssignmentService;
 
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -40,6 +43,7 @@ class SpaceParticipationHttpTest {
     @Autowired WebApplicationContext context;
     @Autowired UserRepository users;
     @Autowired JdbcTemplate jdbc;
+    @Autowired TaskAssignmentService assignments;
     MockMvc mvc;
     User owner;
     User recipient;
@@ -97,6 +101,7 @@ class SpaceParticipationHttpTest {
     void cleanup() {
         jdbc.execute("DROP TRIGGER IF EXISTS fail_vlad_accept ON space_invitations");
         jdbc.execute("DROP FUNCTION IF EXISTS fail_vlad_accept()");
+        jdbc.update("DELETE FROM tasks WHERE space_id IN (?,?)", space, otherSpace);
         jdbc.update("DELETE FROM task_statuses WHERE space_id IN (?,?)", space, otherSpace);
         jdbc.update("DELETE FROM spaces WHERE id IN (?,?)", space, otherSpace);
         users.deleteAllById(
@@ -154,6 +159,40 @@ class SpaceParticipationHttpTest {
                 Integer.class,
                 space,
                 user.getId());
+    }
+
+    @Test
+    void invitationAcceptanceEnablesClaimAndRecordsTheRecipientInHistory() throws Exception {
+        String invitationId = invitation(recipient).get("id").asString();
+        UUID taskId =
+                jdbc.queryForObject(
+                        """
+                INSERT INTO tasks(space_id, creator_user_id, status_id, title)
+                SELECT space_id, ?, id, 'Claim after joining'
+                FROM task_statuses WHERE space_id = ? AND kind = 'INITIAL'
+                RETURNING id
+                """,
+                        UUID.class,
+                        owner.getId(),
+                        space);
+        assertThrows(
+                TaskAccessException.class,
+                () -> assignments.claim(space, recipient.getId(), taskId));
+
+        decide(recipient, invitationId, "ACCEPTED").andExpect(status().isOk());
+        var claimed = assignments.claim(space, recipient.getId(), taskId);
+        assertEquals(recipient.getId(), claimed.assigneeId());
+        assertEquals(AssignmentSource.SELF_CLAIM, claimed.assignmentSource());
+        assertEquals(
+                recipient.getId(),
+                jdbc.queryForObject(
+                        "SELECT actor_user_id FROM task_changes WHERE task_id=? AND kind='UPDATED'",
+                        UUID.class,
+                        taskId));
+
+        var released = assignments.release(space, recipient.getId(), taskId);
+        assertNull(released.assigneeId());
+        assertNull(released.assignmentSource());
     }
 
     @Test
