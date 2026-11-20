@@ -5,7 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import io.github.vijteam.didgeridoo.tasks.internal.error.TaskValidationException;
+import io.github.vijteam.didgeridoo.shared.ApplicationException;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -69,7 +69,7 @@ class TaskRequestParserTest {
                 "{\"title\":\"Task\",\"deadline\":\"2026-11-08T15:00:00\"}"
             })
     void rejectsInvalidCreateShapesAndTypes(String body) {
-        assertThrows(TaskValidationException.class, () -> parser.create(body));
+        assertThrows(ApplicationException.class, () -> parser.create(body));
     }
 
     @ParameterizedTest
@@ -84,7 +84,7 @@ class TaskRequestParserTest {
                 "{\"description\":42}"
             })
     void rejectsInvalidPatch(String body) {
-        assertThrows(TaskValidationException.class, () -> parser.patch(body));
+        assertThrows(ApplicationException.class, () -> parser.patch(body));
     }
 
     @ParameterizedTest
@@ -97,7 +97,7 @@ class TaskRequestParserTest {
                 "{\"statusId\":\"00000000-0000-0000-0000-000000000000\",\"actorId\":\"fake\"}"
             })
     void rejectsInvalidStatusRequest(String body) {
-        assertThrows(TaskValidationException.class, () -> parser.status(body));
+        assertThrows(ApplicationException.class, () -> parser.status(body));
     }
 
     @Test

@@ -1,5 +1,7 @@
 package io.github.vijteam.didgeridoo.tasks.internal.controller;
 
+import io.github.vijteam.didgeridoo.shared.FieldErrorCode;
+import io.github.vijteam.didgeridoo.shared.FieldValidationException;
 import io.github.vijteam.didgeridoo.tasks.internal.error.TaskValidationException;
 import io.github.vijteam.didgeridoo.tasks.internal.model.TaskPriority;
 import io.github.vijteam.didgeridoo.tasks.internal.service.CreateTask;
@@ -85,7 +87,8 @@ public class TaskRequestParser {
         }
         for (String name : root.propertyNames()) {
             if (!allowed.contains(name)) {
-                throw invalid(name);
+                throw new FieldValidationException(
+                        name, FieldErrorCode.UNKNOWN_FIELD, "Unknown request field");
             }
         }
         return root;
@@ -97,10 +100,11 @@ public class TaskRequestParser {
             if (nullable) {
                 return null;
             }
-            throw invalid(field);
+            throw new FieldValidationException(field, FieldErrorCode.REQUIRED, "Field is required");
         }
         if (!value.isTextual()) {
-            throw invalid(field);
+            throw new FieldValidationException(
+                    field, FieldErrorCode.INVALID_TYPE, "Expected a string");
         }
         return value.asString();
     }
@@ -108,7 +112,12 @@ public class TaskRequestParser {
     private boolean permission(JsonNode root) {
         JsonNode value = root.get("assigneeCanEdit");
         if (value == null || !value.isBoolean()) {
-            throw invalid("assigneeCanEdit");
+            throw new FieldValidationException(
+                    "assigneeCanEdit",
+                    value == null || value.isNull()
+                            ? FieldErrorCode.REQUIRED
+                            : FieldErrorCode.INVALID_TYPE,
+                    "Expected a boolean");
         }
         return value.booleanValue();
     }
@@ -150,7 +159,8 @@ public class TaskRequestParser {
         }
     }
 
-    private TaskValidationException invalid(String field) {
-        return new TaskValidationException(field, "Invalid or unknown request field");
+    private FieldValidationException invalid(String field) {
+        return new FieldValidationException(
+                field, FieldErrorCode.INVALID_FORMAT, "Invalid or unknown request field");
     }
 }

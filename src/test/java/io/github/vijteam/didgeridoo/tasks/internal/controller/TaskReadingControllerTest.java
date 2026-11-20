@@ -116,7 +116,7 @@ class TaskReadingControllerTest {
         when(provider.getIfAvailable()).thenReturn(null);
         mvc.perform(get(base()).principal(principal))
                 .andExpect(status().isServiceUnavailable())
-                .andExpect(jsonPath("$.code").value("DEPENDENCY_UNAVAILABLE"));
+                .andExpect(jsonPath("$.code").value("SERVICE_UNAVAILABLE"));
     }
 
     @Test
@@ -128,7 +128,7 @@ class TaskReadingControllerTest {
                                 "internal membership details"));
         mvc.perform(get(base() + "/" + task).principal(principal))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
         doThrow(new TaskNotFoundException("internal task details"))
                 .when(reading)
                 .get(space, actor, task);

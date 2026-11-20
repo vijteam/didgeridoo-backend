@@ -7,7 +7,10 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 
 import io.github.vijteam.didgeridoo.TestcontainersConfiguration;
+import io.github.vijteam.didgeridoo.shared.ApplicationException;
 import io.github.vijteam.didgeridoo.tasks.api.StatusInitializer;
+import io.github.vijteam.didgeridoo.tasks.internal.error.TaskAccessException;
+import io.github.vijteam.didgeridoo.tasks.internal.error.TaskNotFoundException;
 import io.github.vijteam.didgeridoo.tasks.internal.repository.TaskChangeRepository;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -19,7 +22,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
-import java.util.NoSuchElementException;
 import java.util.UUID;
 
 @SpringBootTest
@@ -111,7 +113,7 @@ class TaskStatusChangeTest {
     @Test
     void anyMemberCanChangeFreeTaskButNotSomeoneElsesAssignedTask() {
         assertThrows(
-                SecurityException.class,
+                TaskAccessException.class,
                 () -> statusChange.change(space, other, task, finalStatus));
         jdbc.update(
                 "UPDATE tasks SET assignee_user_id=null, assignment_source=null WHERE id=?", task);
@@ -122,11 +124,11 @@ class TaskStatusChangeTest {
     void guestAndFormerCreatorCannotChangeStatus() {
         when(access.roleOf(space, creator)).thenReturn(TaskSpaceAccess.Role.GUEST);
         assertThrows(
-                SecurityException.class,
+                TaskAccessException.class,
                 () -> statusChange.change(space, creator, task, finalStatus));
         when(access.roleOf(space, creator)).thenReturn(null);
         assertThrows(
-                SecurityException.class,
+                TaskAccessException.class,
                 () -> statusChange.change(space, creator, task, finalStatus));
     }
 
@@ -140,17 +142,16 @@ class TaskStatusChangeTest {
                         UUID.class,
                         anotherSpace);
         assertThrows(
-                IllegalArgumentException.class,
+                ApplicationException.class,
                 () -> statusChange.change(space, creator, task, foreignStatus));
         assertThrows(
-                IllegalArgumentException.class,
+                ApplicationException.class,
                 () -> statusChange.change(space, creator, task, UUID.randomUUID()));
         assertThrows(
-                IllegalArgumentException.class,
-                () -> statusChange.change(space, creator, task, null));
+                ApplicationException.class, () -> statusChange.change(space, creator, task, null));
         when(access.roleOf(anotherSpace, creator)).thenReturn(TaskSpaceAccess.Role.OWNER);
         assertThrows(
-                NoSuchElementException.class,
+                TaskNotFoundException.class,
                 () -> statusChange.change(anotherSpace, creator, task, foreignStatus));
     }
 

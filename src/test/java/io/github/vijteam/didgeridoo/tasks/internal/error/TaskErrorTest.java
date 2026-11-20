@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import io.github.vijteam.didgeridoo.shared.ApplicationException;
 import io.github.vijteam.didgeridoo.tasks.internal.repository.TaskChangeRepository;
 import io.github.vijteam.didgeridoo.tasks.internal.repository.TaskRepository;
 import io.github.vijteam.didgeridoo.tasks.internal.repository.TaskStatusRepository;
@@ -70,7 +71,7 @@ class TaskErrorTest {
         var reading = new TaskReadingService(tasks, provider);
         assertThrows(
                 TaskNotFoundException.class, () -> reading.get(space, actor, UUID.randomUUID()));
-        assertThrows(TaskValidationException.class, () -> reading.list(space, actor, -1, 20));
+        assertThrows(ApplicationException.class, () -> reading.list(space, actor, -1, 20));
     }
 
     @Test
@@ -91,8 +92,10 @@ class TaskErrorTest {
         assertEquals(
                 "statusId",
                 assertThrows(
-                                TaskValidationException.class,
+                                io.github.vijteam.didgeridoo.shared.FieldValidationException.class,
                                 () -> creation.create(space, actor, explicit))
-                        .getField());
+                        .getViolations()
+                        .getFirst()
+                        .field());
     }
 }

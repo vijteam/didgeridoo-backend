@@ -1,9 +1,10 @@
 package io.github.vijteam.didgeridoo.tasks.internal.error;
 
-import java.util.NoSuchElementException;
+import io.github.vijteam.didgeridoo.shared.ApiErrorCode;
+import io.github.vijteam.didgeridoo.shared.ApplicationException;
 
-public class TaskNotFoundException extends NoSuchElementException {
+public class TaskNotFoundException extends ApplicationException {
     public TaskNotFoundException(String message) {
-        super(message);
+        super(ApiErrorCode.NOT_FOUND, "Resource not found");
     }
 }

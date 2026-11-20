@@ -61,7 +61,7 @@ class TaskWritingSecurityTest {
                 post(base).content("{}"),
                 patch(task).content("{}"),
                 put(task + "/status").content("{}"),
-                delete(task + "?confirmed=true"));
+                delete(task + ""));
     }
 
     @Test
