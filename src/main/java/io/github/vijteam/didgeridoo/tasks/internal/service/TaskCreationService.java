@@ -49,6 +49,7 @@ public class TaskCreationService {
         if (spaceId == null || actorId == null || command == null) {
             throw new TaskValidationException("spaceId, actorId and command are required");
         }
+        statuses.lockInitialForRead(spaceId);
         TaskSpaceAccess membership = access.getIfAvailable();
         if (membership == null) {
             throw new TaskDependencyException(

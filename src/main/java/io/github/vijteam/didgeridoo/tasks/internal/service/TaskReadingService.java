@@ -38,14 +38,47 @@ public class TaskReadingService {
     }
 
     public Page<TaskView> list(UUID spaceId, UUID actorId, int page, int size) {
-        if (page < 0 || size < 1 || size > 100) {
-            throw new TaskValidationException(
-                    "page must be non-negative and size must be between 1 and 100");
-        }
+        validatePage(page, size);
         requireMembership(spaceId, actorId);
         return tasks.findAllBySpaceId(
                         spaceId, PageRequest.of(page, size, Sort.by("createdAt", "id")))
                 .map(TaskView::from);
+    }
+
+    public Page<TaskView> search(
+            UUID spaceId, UUID actorId, TaskSearch filter, int page, int size) {
+        validatePage(page, size);
+        requireMembership(spaceId, actorId);
+        if (filter == null) {
+            throw new TaskValidationException("Search filters are required");
+        }
+        var order = filter.order() == null ? TaskSearch.Order.CREATED : filter.order();
+        return tasks.search(
+                        spaceId,
+                        searchPattern(filter.text()),
+                        filter.assigneeId(),
+                        filter.statusId(),
+                        filter.from() != null,
+                        filter.from(),
+                        filter.until() != null,
+                        filter.until(),
+                        order.name(),
+                        PageRequest.of(page, size))
+                .map(TaskView::from);
+    }
+
+    private String searchPattern(String text) {
+        if (text == null || text.isBlank()) {
+            return null;
+        }
+        return "%" + text.replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";
+    }
+
+    private void validatePage(int page, int size) {
+        if (page < 0 || size < 1 || size > 100) {
+            throw new TaskValidationException(
+                    "page must be non-negative and size must be between 1 and 100");
+        }
     }
 
     private void requireMembership(UUID spaceId, UUID actorId) {

@@ -8,8 +8,10 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -21,7 +23,57 @@ public interface TaskRepository extends JpaRepository<Task, UUID> {
 
     Page<Task> findAllBySpaceId(UUID spaceId, Pageable pageable);
 
+    String SEARCH_FILTERS =
+            """
+            where t.spaceId = :spaceId
+              and (:pattern is null or t.title ilike :pattern escape '!'
+                                    or t.description ilike :pattern escape '!')
+              and (:assigneeId is null or t.assigneeId = :assigneeId)
+              and (:statusId is null or t.statusId = :statusId)
+              and (:hasFrom = false or t.deadline >= :from)
+              and (:hasUntil = false or t.deadline < :until)
+            """;
+
+    @Query(
+            value =
+                    """
+                    select t from Task t
+                    join TaskStatus s on s.spaceId = t.spaceId and s.id = t.statusId
+                    """
+                            + SEARCH_FILTERS
+                            + """
+                    order by case when :orderBy = 'STATUS' then s.position end,
+                             case when :orderBy = 'DEADLINE' then t.deadline end nulls last,
+                             t.createdAt, t.id
+                    """,
+            countQuery = "select count(t) from Task t " + SEARCH_FILTERS)
+    Page<Task> search(
+            UUID spaceId,
+            String pattern,
+            UUID assigneeId,
+            UUID statusId,
+            boolean hasFrom,
+            Instant from,
+            boolean hasUntil,
+            Instant until,
+            String orderBy,
+            Pageable pageable);
+
     Optional<Task> findByIdAndSpaceId(UUID id, UUID spaceId);
 
     List<Task> findAllBySpaceIdOrderByCreatedAtAscIdAsc(UUID spaceId);
+
+    long countBySpaceIdAndStatusId(UUID spaceId, UUID statusId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    List<Task> findAllBySpaceIdAndStatusIdOrderById(UUID spaceId, UUID statusId);
+
+    long countBySpaceIdAndAssigneeId(UUID spaceId, UUID assigneeId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    List<Task> findAllBySpaceIdAndAssigneeIdOrderById(UUID spaceId, UUID assigneeId);
+
+    @Modifying
+    @Query("delete from Task t where t.spaceId = :spaceId")
+    void deleteSpaceTasks(UUID spaceId);
 }

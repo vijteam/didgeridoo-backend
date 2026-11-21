@@ -12,6 +12,7 @@ import io.github.vijteam.didgeridoo.tasks.internal.model.Task;
 import io.github.vijteam.didgeridoo.tasks.internal.model.TaskChange;
 import io.github.vijteam.didgeridoo.tasks.internal.repository.TaskChangeRepository;
 import io.github.vijteam.didgeridoo.tasks.internal.repository.TaskRepository;
+import io.github.vijteam.didgeridoo.tasks.internal.repository.TaskStatusRepository;
 
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
@@ -25,14 +26,17 @@ import java.util.UUID;
 public class TaskAssignmentService {
     private final TaskRepository tasks;
     private final TaskChangeRepository changes;
+    private final TaskStatusRepository statuses;
     private final ObjectProvider<TaskSpaceAccess> access;
 
     public TaskAssignmentService(
             TaskRepository tasks,
             TaskChangeRepository changes,
+            TaskStatusRepository statuses,
             ObjectProvider<TaskSpaceAccess> access) {
         this.tasks = tasks;
         this.changes = changes;
+        this.statuses = statuses;
         this.access = access;
     }
 
@@ -92,6 +96,7 @@ public class TaskAssignmentService {
         if (spaceId == null || actorId == null || taskId == null) {
             throw new TaskValidationException("Identifiers are required");
         }
+        statuses.lockInitialForRead(spaceId);
         TaskSpaceAccess.Role role = membership().roleOf(spaceId, actorId);
         if (role == null) {
             throw new TaskAccessException(

@@ -42,6 +42,7 @@ public class TaskStatusChangeService {
         if (spaceId == null || actorId == null || taskId == null || statusId == null) {
             throw new TaskValidationException("spaceId, actorId, taskId and statusId are required");
         }
+        statuses.lockInitialForRead(spaceId);
         TaskSpaceAccess membership = access.getIfAvailable();
         if (membership == null) {
             throw new TaskDependencyException(
