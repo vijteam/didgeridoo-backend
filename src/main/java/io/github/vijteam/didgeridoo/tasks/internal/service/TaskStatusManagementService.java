@@ -1,6 +1,5 @@
 package io.github.vijteam.didgeridoo.tasks.internal.service;
 
-import io.github.vijteam.didgeridoo.tasks.internal.error.TaskAccessException;
 import io.github.vijteam.didgeridoo.tasks.internal.error.TaskConflictException;
 import io.github.vijteam.didgeridoo.tasks.internal.error.TaskDependencyException;
 import io.github.vijteam.didgeridoo.tasks.internal.error.TaskNotFoundException;
@@ -12,7 +11,6 @@ import io.github.vijteam.didgeridoo.tasks.internal.repository.TaskChangeReposito
 import io.github.vijteam.didgeridoo.tasks.internal.repository.TaskRepository;
 import io.github.vijteam.didgeridoo.tasks.internal.repository.TaskStatusRepository;
 
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,22 +27,22 @@ public class TaskStatusManagementService {
     private final TaskStatusRepository statuses;
     private final TaskRepository tasks;
     private final TaskChangeRepository changes;
-    private final ObjectProvider<TaskSpaceAccess> access;
+    private final TaskMembership membership;
 
     TaskStatusManagementService(
             TaskStatusRepository statuses,
             TaskRepository tasks,
             TaskChangeRepository changes,
-            ObjectProvider<TaskSpaceAccess> access) {
+            TaskMembership membership) {
         this.statuses = statuses;
         this.tasks = tasks;
         this.changes = changes;
-        this.access = access;
+        this.membership = membership;
     }
 
     @Transactional(readOnly = true)
     public List<TaskStatusView> list(UUID spaceId, UUID actorId) {
-        memberRole(spaceId, actorId);
+        membership.requireMember(spaceId, actorId);
         return views(statuses.findAllBySpaceIdOrderByPositionAsc(spaceId));
     }
 
@@ -106,7 +104,7 @@ public class TaskStatusManagementService {
 
     @Transactional(readOnly = true)
     public long deletionImpact(UUID spaceId, UUID actorId, UUID statusId) {
-        requireOwner(spaceId, actorId);
+        membership.requireOwner(spaceId, actorId);
         requireIntermediate(find(spaceId, statusId));
         return tasks.countBySpaceIdAndStatusId(spaceId, statusId);
     }
@@ -142,7 +140,7 @@ public class TaskStatusManagementService {
             throw new TaskValidationException("spaceId and actorId are required");
         }
         var initial = statuses.lockInitialForWrite(spaceId);
-        requireOwner(spaceId, actorId);
+        membership.requireOwner(spaceId, actorId);
         return initial.orElseThrow(
                 () ->
                         new TaskDependencyException(
@@ -162,30 +160,6 @@ public class TaskStatusManagementService {
         if (status.getKind() != StatusKind.INTERMEDIATE) {
             throw new TaskConflictException("Only intermediate statuses can be deleted");
         }
-    }
-
-    private void requireOwner(UUID spaceId, UUID actorId) {
-        if (memberRole(spaceId, actorId) != TaskSpaceAccess.Role.OWNER) {
-            throw new TaskAccessException("Only the owner can manage statuses");
-        }
-    }
-
-    private TaskSpaceAccess.Role memberRole(UUID spaceId, UUID actorId) {
-        if (spaceId == null || actorId == null) {
-            throw new TaskValidationException("spaceId and actorId are required");
-        }
-        var membership = access.getIfAvailable();
-        if (membership == null) {
-            throw new TaskDependencyException(
-                    TaskDependencyException.Reason.SPACES_UNAVAILABLE,
-                    "Spaces access adapter is not configured");
-        }
-        var role = membership.roleOf(spaceId, actorId);
-        if (role == null) {
-            throw new TaskAccessException(
-                    TaskAccessException.Reason.NOT_MEMBER, "Space membership is required");
-        }
-        return role;
     }
 
     private List<TaskStatusView> views(List<TaskStatus> ordered) {

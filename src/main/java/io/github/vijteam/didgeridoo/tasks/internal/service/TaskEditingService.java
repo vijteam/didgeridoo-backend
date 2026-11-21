@@ -71,7 +71,7 @@ public class TaskEditingService {
                 tasks.findForUpdateByIdAndSpaceId(taskId, spaceId)
                         .orElseThrow(() -> new TaskNotFoundException("Task not found"));
         boolean manages = role == TaskSpaceAccess.Role.OWNER || actorId.equals(task.getCreatorId());
-        if (!manages && !(actorId.equals(task.getAssigneeId()) && task.isAssigneeCanEdit())) {
+        if (!canEdit(task, actorId, role)) {
             throw new TaskAccessException("Task editing is not allowed");
         }
         EditTask command = merge.apply(task);
@@ -96,5 +96,13 @@ public class TaskEditingService {
             changes.saveAndFlush(change);
         }
         return TaskView.from(task);
+    }
+
+    static boolean canEdit(Task task, UUID actorId, TaskSpaceAccess.Role role) {
+        return role == TaskSpaceAccess.Role.OWNER
+                || (role == TaskSpaceAccess.Role.MEMBER
+                        && (actorId.equals(task.getCreatorId())
+                                || (actorId.equals(task.getAssigneeId())
+                                        && task.isAssigneeCanEdit())));
     }
 }

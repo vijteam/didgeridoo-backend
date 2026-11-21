@@ -30,6 +30,9 @@ public interface TaskRepository extends JpaRepository<Task, UUID> {
                                     or t.description ilike :pattern escape '!')
               and (:assigneeId is null or t.assigneeId = :assigneeId)
               and (:statusId is null or t.statusId = :statusId)
+              and (:tagId is null or exists (
+                  select 1 from TaskTag x where x.spaceId = t.spaceId
+                      and x.taskId = t.id and x.tagId = :tagId))
               and (:hasFrom = false or t.deadline >= :from)
               and (:hasUntil = false or t.deadline < :until)
             """;
@@ -52,6 +55,7 @@ public interface TaskRepository extends JpaRepository<Task, UUID> {
             String pattern,
             UUID assigneeId,
             UUID statusId,
+            UUID tagId,
             boolean hasFrom,
             Instant from,
             boolean hasUntil,
@@ -67,6 +71,16 @@ public interface TaskRepository extends JpaRepository<Task, UUID> {
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     List<Task> findAllBySpaceIdAndStatusIdOrderById(UUID spaceId, UUID statusId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query(
+            """
+            select t from Task t where t.spaceId = :spaceId and exists (
+                select 1 from TaskTag x where x.spaceId = :spaceId
+                    and x.taskId = t.id and x.tagId = :tagId)
+            order by t.id
+            """)
+    List<Task> lockAllWithTag(UUID spaceId, UUID tagId);
 
     long countBySpaceIdAndAssigneeId(UUID spaceId, UUID assigneeId);
 

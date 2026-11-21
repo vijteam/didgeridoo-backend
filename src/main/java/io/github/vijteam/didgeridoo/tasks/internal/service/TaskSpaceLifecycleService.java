@@ -6,6 +6,7 @@ import io.github.vijteam.didgeridoo.tasks.internal.model.TaskChange;
 import io.github.vijteam.didgeridoo.tasks.internal.repository.TaskChangeRepository;
 import io.github.vijteam.didgeridoo.tasks.internal.repository.TaskRepository;
 import io.github.vijteam.didgeridoo.tasks.internal.repository.TaskStatusRepository;
+import io.github.vijteam.didgeridoo.tasks.internal.repository.TaskTagRepository;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -19,12 +20,17 @@ class TaskSpaceLifecycleService implements TaskSpaceLifecycle {
     private final TaskRepository tasks;
     private final TaskStatusRepository statuses;
     private final TaskChangeRepository changes;
+    private final TaskTagRepository tags;
 
     TaskSpaceLifecycleService(
-            TaskRepository tasks, TaskStatusRepository statuses, TaskChangeRepository changes) {
+            TaskRepository tasks,
+            TaskStatusRepository statuses,
+            TaskChangeRepository changes,
+            TaskTagRepository tags) {
         this.tasks = tasks;
         this.statuses = statuses;
         this.changes = changes;
+        this.tags = tags;
     }
 
     @Override
@@ -67,6 +73,7 @@ class TaskSpaceLifecycleService implements TaskSpaceLifecycle {
         statuses.lockInitialForWrite(spaceId);
         // PostgreSQL cascades task deletion to history. Statuses can then be deleted.
         tasks.deleteSpaceTasks(spaceId);
+        tags.deleteSpaceTags(spaceId);
         statuses.deleteSpaceStatuses(spaceId);
     }
 }

@@ -58,6 +58,7 @@ public class TaskReadingService {
                         searchPattern(filter.text()),
                         filter.assigneeId(),
                         filter.statusId(),
+                        filter.tagId(),
                         filter.from() != null,
                         filter.from(),
                         filter.until() != null,

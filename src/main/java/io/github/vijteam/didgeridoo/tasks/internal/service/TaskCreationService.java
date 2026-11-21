@@ -13,11 +13,13 @@ import io.github.vijteam.didgeridoo.tasks.internal.model.TaskStatus;
 import io.github.vijteam.didgeridoo.tasks.internal.repository.TaskChangeRepository;
 import io.github.vijteam.didgeridoo.tasks.internal.repository.TaskRepository;
 import io.github.vijteam.didgeridoo.tasks.internal.repository.TaskStatusRepository;
+import io.github.vijteam.didgeridoo.tasks.internal.repository.TaskTagRepository;
 
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -26,16 +28,19 @@ public class TaskCreationService {
     private final TaskRepository tasks;
     private final TaskStatusRepository statuses;
     private final TaskChangeRepository changes;
+    private final TaskTagRepository tags;
     private final ObjectProvider<TaskSpaceAccess> access;
 
     public TaskCreationService(
             TaskRepository tasks,
             TaskStatusRepository statuses,
             TaskChangeRepository changes,
+            TaskTagRepository tags,
             ObjectProvider<TaskSpaceAccess> access) {
         this.tasks = tasks;
         this.statuses = statuses;
         this.changes = changes;
+        this.tags = tags;
         this.access = access;
     }
 
@@ -93,6 +98,9 @@ public class TaskCreationService {
                                                         "statusId",
                                                         FieldErrorCode.INVALID_REFERENCE,
                                                         "Status does not belong to this space"));
+        var selectedTags =
+                TaskTagSelection.resolve(
+                        tags, spaceId, command.tagIds() == null ? List.of() : command.tagIds());
         Task task = new Task(spaceId, actorId, status.getId(), command.title());
         task.updateDetails(
                 command.title(),
@@ -104,7 +112,10 @@ public class TaskCreationService {
             task.assign(command.assigneeId(), AssignmentSource.DIRECT);
         }
         tasks.saveAndFlush(task);
-        changes.saveAndFlush(TaskChange.created(task, actorId));
+        tags.insertLinks(spaceId, task.getId(), selectedTags);
+        var event = TaskChange.created(task, actorId);
+        selectedTags.forEach(tag -> event.recordTagChange(tag.id(), null, tag.name()));
+        changes.saveAndFlush(event);
         return TaskView.from(task);
     }
 }

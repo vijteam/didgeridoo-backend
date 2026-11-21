@@ -103,6 +103,10 @@ public class Task {
         this.assignmentSource = null;
     }
 
+    public void markUpdated() {
+        this.updatedAt = Instant.now();
+    }
+
     public UUID getId() {
         return id;
     }
