@@ -5,7 +5,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.when;
 
 import io.github.vijteam.didgeridoo.TestcontainersConfiguration;
+import io.github.vijteam.didgeridoo.shared.ApplicationException;
 import io.github.vijteam.didgeridoo.tasks.api.StatusInitializer;
+import io.github.vijteam.didgeridoo.tasks.internal.error.TaskAccessException;
+import io.github.vijteam.didgeridoo.tasks.internal.error.TaskNotFoundException;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -15,7 +18,6 @@ import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
-import java.util.NoSuchElementException;
 import java.util.UUID;
 
 @SpringBootTest
@@ -61,7 +63,7 @@ class TaskDeletionAndHistoryTest {
 
     @Test
     void creatorDeletesConfirmedTaskWithHistoryButKeepsStatuses() {
-        deletion.delete(space, creator, task, true);
+        deletion.delete(space, creator, task);
         assertEquals(
                 0,
                 jdbc.queryForObject("SELECT count(*) FROM tasks WHERE id=?", Integer.class, task));
@@ -80,14 +82,13 @@ class TaskDeletionAndHistoryTest {
     @Test
     void ownerCanDeleteOthersTask() {
         when(access.roleOf(space, other)).thenReturn(TaskSpaceAccess.Role.OWNER);
-        deletion.delete(space, other, task, true);
-        assertThrows(NoSuchElementException.class, () -> reading.get(space, creator, task));
+        deletion.delete(space, other, task);
+        assertThrows(TaskNotFoundException.class, () -> reading.get(space, creator, task));
     }
 
     @Test
-    void requiresConfirmation() {
-        assertThrows(
-                IllegalArgumentException.class, () -> deletion.delete(space, creator, task, false));
+    void rejectsMissingTaskIdentifier() {
+        assertThrows(ApplicationException.class, () -> deletion.delete(space, creator, null));
         assertEquals(task, reading.get(space, creator, task).id());
     }
 
@@ -97,11 +98,11 @@ class TaskDeletionAndHistoryTest {
                 "UPDATE tasks SET assignee_user_id=?, assignee_can_edit=true WHERE id=?",
                 other,
                 task);
-        assertThrows(SecurityException.class, () -> deletion.delete(space, other, task, true));
+        assertThrows(TaskAccessException.class, () -> deletion.delete(space, other, task));
         when(access.roleOf(space, creator)).thenReturn(TaskSpaceAccess.Role.GUEST);
-        assertThrows(SecurityException.class, () -> deletion.delete(space, creator, task, true));
+        assertThrows(TaskAccessException.class, () -> deletion.delete(space, creator, task));
         when(access.roleOf(space, creator)).thenReturn(null);
-        assertThrows(SecurityException.class, () -> deletion.delete(space, creator, task, true));
+        assertThrows(TaskAccessException.class, () -> deletion.delete(space, creator, task));
     }
 
     @Test
@@ -111,7 +112,7 @@ class TaskDeletionAndHistoryTest {
                 () ->
                         transaction.executeWithoutResult(
                                 tx -> {
-                                    deletion.delete(space, creator, task, true);
+                                    deletion.delete(space, creator, task);
                                     throw new IllegalStateException("Workflow failed");
                                 }));
         assertEquals(task, reading.get(space, creator, task).id());
@@ -159,12 +160,11 @@ class TaskDeletionAndHistoryTest {
     @Test
     void deniesOutsiderAndCrossSpaceRequests() {
         when(access.roleOf(space, other)).thenReturn(null);
-        assertThrows(SecurityException.class, () -> history.list(space, other, task, 0, 20));
+        assertThrows(TaskAccessException.class, () -> history.list(space, other, task, 0, 20));
         UUID wrong = UUID.randomUUID();
         when(access.roleOf(wrong, creator)).thenReturn(TaskSpaceAccess.Role.OWNER);
-        assertThrows(NoSuchElementException.class, () -> history.list(wrong, creator, task, 0, 20));
-        assertThrows(
-                NoSuchElementException.class, () -> deletion.delete(wrong, creator, task, true));
+        assertThrows(TaskNotFoundException.class, () -> history.list(wrong, creator, task, 0, 20));
+        assertThrows(TaskNotFoundException.class, () -> deletion.delete(wrong, creator, task));
     }
 
     @Test
@@ -178,11 +178,8 @@ class TaskDeletionAndHistoryTest {
 
     @Test
     void validatesHistoryPagination() {
-        assertThrows(
-                IllegalArgumentException.class, () -> history.list(space, creator, task, -1, 20));
-        assertThrows(
-                IllegalArgumentException.class, () -> history.list(space, creator, task, 0, 101));
-        assertThrows(
-                IllegalArgumentException.class, () -> history.list(space, creator, null, 0, 20));
+        assertThrows(ApplicationException.class, () -> history.list(space, creator, task, -1, 20));
+        assertThrows(ApplicationException.class, () -> history.list(space, creator, task, 0, 101));
+        assertThrows(ApplicationException.class, () -> history.list(space, creator, null, 0, 20));
     }
 }

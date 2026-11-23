@@ -102,7 +102,7 @@ class TaskWritingHttpTest {
                 3,
                 jdbc.queryForObject(
                         "SELECT count(*) FROM task_changes WHERE task_id=?", Integer.class, task));
-        mvc.perform(delete(base() + "/" + task + "?confirmed=true").principal(principal))
+        mvc.perform(delete(base() + "/" + task + "").principal(principal))
                 .andExpect(status().isNoContent());
         assertEquals(
                 0,
@@ -138,7 +138,7 @@ class TaskWritingHttpTest {
     }
 
     @Test
-    void rejectsMalformedUnknownFieldsAndUnconfirmedDelete() throws Exception {
+    void rejectsMalformedUnknownFieldsAndDeletesWithoutConfirmation() throws Exception {
         mvc.perform(
                         post(base())
                                 .principal(principal)
@@ -154,11 +154,91 @@ class TaskWritingHttpTest {
                 .andExpect(status().isBadRequest());
         UUID task = create();
         mvc.perform(delete(base() + "/" + task).principal(principal))
-                .andExpect(status().isBadRequest());
-        mvc.perform(delete(base() + "/" + task + "?confirmed=false").principal(principal))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isNoContent());
         assertEquals(
-                1,
+                0,
                 jdbc.queryForObject("SELECT count(*) FROM tasks WHERE id=?", Integer.class, task));
+    }
+
+    @Test
+    void invalidStatusReferenceHasSharedFieldError() throws Exception {
+        mvc.perform(
+                        post(base())
+                                .principal(principal)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        "{\"title\":\"Task\",\"statusId\":\""
+                                                + UUID.randomUUID()
+                                                + "\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("statusId"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("INVALID_REFERENCE"));
+    }
+
+    @Test
+    void defaultStatusUsesFirstPositionEvenWithoutInitialKind() throws Exception {
+        jdbc.update(
+                "UPDATE task_statuses SET kind='INTERMEDIATE' WHERE space_id=? AND kind='INITIAL'",
+                space);
+        UUID first =
+                jdbc.queryForObject(
+                        "SELECT id FROM task_statuses WHERE space_id=? ORDER BY position LIMIT 1",
+                        UUID.class,
+                        space);
+        UUID task = create();
+        assertEquals(
+                first,
+                jdbc.queryForObject("SELECT status_id FROM tasks WHERE id=?", UUID.class, task));
+    }
+
+    @Test
+    void fieldFailuresUseSharedCodes() throws Exception {
+        String[] bodies = {
+            "{\"title\":\" \"}", "{\"title\":1}", "{\"title\":\"Task\",\"unexpected\":true}", "{}"
+        };
+        String[] codes = {"BLANK", "INVALID_TYPE", "UNKNOWN_FIELD", "REQUIRED"};
+        for (int i = 0; i < bodies.length; i++) {
+            mvc.perform(
+                            post(base())
+                                    .principal(principal)
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content(bodies[i]))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.fieldErrors[0].code").value(codes[i]));
+        }
+    }
+
+    @Test
+    void requestWideFailureDoesNotInventFieldErrors() throws Exception {
+        UUID task = create();
+        mvc.perform(
+                        patch(base() + "/" + task)
+                                .principal(principal)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.fieldErrors").doesNotExist());
+    }
+
+    @Test
+    void unsupportedContentTypeUsesSharedErrorShape() throws Exception {
+        mvc.perform(
+                        post(base())
+                                .principal(principal)
+                                .contentType(MediaType.TEXT_PLAIN)
+                                .content("ignored"))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(jsonPath("$.code").value("UNSUPPORTED_MEDIA_TYPE"));
+        for (String type : new String[] {"application/*", "*/*"}) {
+            mvc.perform(post(base()).principal(principal).contentType(type).content("{}"))
+                    .andExpect(status().isUnsupportedMediaType())
+                    .andExpect(jsonPath("$.code").value("UNSUPPORTED_MEDIA_TYPE"));
+        }
+        assertEquals(
+                0,
+                jdbc.queryForObject(
+                        "SELECT count(*) FROM tasks WHERE space_id=?", Integer.class, space));
     }
 }

@@ -1,19 +1,11 @@
 package io.github.vijteam.didgeridoo.tasks.internal.error;
 
-public class TaskValidationException extends IllegalArgumentException {
-    private final String field;
+import io.github.vijteam.didgeridoo.shared.ApiErrorCode;
+import io.github.vijteam.didgeridoo.shared.ApplicationException;
 
+/** Request-wide validation failure without a fictional field violation. */
+public class TaskValidationException extends ApplicationException {
     public TaskValidationException(String message) {
-        this(null, message);
-    }
-
-    public TaskValidationException(String field, String message) {
-        super(message);
-        this.field = field;
-    }
-
-    /** Null when validation concerns several fields or the command itself. */
-    public String getField() {
-        return field;
+        super(ApiErrorCode.VALIDATION_FAILED, message);
     }
 }

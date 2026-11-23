@@ -6,6 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.github.vijteam.didgeridoo.shared.ApplicationException;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
@@ -40,8 +42,7 @@ class TaskTest {
     @ValueSource(strings = {" ", "\t\n", "\u2003"})
     void shouldRejectBlankTitle(String title) {
         assertThrows(
-                IllegalArgumentException.class,
-                () -> new Task(spaceId, creatorId, statusId, title));
+                ApplicationException.class, () -> new Task(spaceId, creatorId, statusId, title));
     }
 
     @Test
@@ -50,18 +51,15 @@ class TaskTest {
         Task task = new Task(spaceId, creatorId, statusId, title);
         assertEquals(title, task.getTitle());
         assertThrows(
-                IllegalArgumentException.class,
+                ApplicationException.class,
                 () -> new Task(spaceId, creatorId, statusId, "🚀".repeat(256)));
     }
 
     @Test
     void shouldRequireSpaceCreatorAndStatusOnCreation() {
-        assertThrows(
-                IllegalArgumentException.class, () -> new Task(null, creatorId, statusId, "Task"));
-        assertThrows(
-                IllegalArgumentException.class, () -> new Task(spaceId, null, statusId, "Task"));
-        assertThrows(
-                IllegalArgumentException.class, () -> new Task(spaceId, creatorId, null, "Task"));
+        assertThrows(ApplicationException.class, () -> new Task(null, creatorId, statusId, "Task"));
+        assertThrows(ApplicationException.class, () -> new Task(spaceId, null, statusId, "Task"));
+        assertThrows(ApplicationException.class, () -> new Task(spaceId, creatorId, null, "Task"));
     }
 
     @Test
@@ -87,10 +85,10 @@ class TaskTest {
     void shouldRejectInvalidUpdateWithoutPartialChanges() {
         Task task = task();
         assertThrows(
-                IllegalArgumentException.class,
+                ApplicationException.class,
                 () -> task.updateDetails("Changed", "Description", Instant.now(), null, true));
         assertThrows(
-                IllegalArgumentException.class,
+                ApplicationException.class,
                 () ->
                         task.updateDetails(
                                 " ", "Description", Instant.now(), TaskPriority.URGENT, true));
@@ -121,7 +119,7 @@ class TaskTest {
         assertEquals(nextStatus, task.getStatusId());
         assertEquals(assignee, task.getAssigneeId());
         assertEquals(AssignmentSource.SELF_CLAIM, task.getAssignmentSource());
-        assertThrows(IllegalArgumentException.class, () -> task.changeStatus(null));
+        assertThrows(ApplicationException.class, () -> task.changeStatus(null));
         assertEquals(nextStatus, task.getStatusId());
     }
 
@@ -130,9 +128,8 @@ class TaskTest {
         Task task = task();
         UUID assignee = UUID.randomUUID();
         task.assign(assignee, AssignmentSource.SELF_CLAIM);
-        assertThrows(
-                IllegalArgumentException.class, () -> task.assign(null, AssignmentSource.DIRECT));
-        assertThrows(IllegalArgumentException.class, () -> task.assign(UUID.randomUUID(), null));
+        assertThrows(ApplicationException.class, () -> task.assign(null, AssignmentSource.DIRECT));
+        assertThrows(ApplicationException.class, () -> task.assign(UUID.randomUUID(), null));
         assertEquals(assignee, task.getAssigneeId());
         assertEquals(AssignmentSource.SELF_CLAIM, task.getAssignmentSource());
         task.assign(assignee, AssignmentSource.DIRECT);

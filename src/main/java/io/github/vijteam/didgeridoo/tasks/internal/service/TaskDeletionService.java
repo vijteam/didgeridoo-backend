@@ -24,10 +24,10 @@ public class TaskDeletionService {
         this.access = access;
     }
 
-    /** actorId comes from authentication; the caller obtains explicit deletion confirmation. */
-    public void delete(UUID spaceId, UUID actorId, UUID taskId, boolean confirmed) {
-        if (spaceId == null || actorId == null || taskId == null || !confirmed) {
-            throw new TaskValidationException("Identifiers and deletion confirmation are required");
+    /** actorId comes from authentication; the caller may obtain deletion confirmation in the UI. */
+    public void delete(UUID spaceId, UUID actorId, UUID taskId) {
+        if (spaceId == null || actorId == null || taskId == null) {
+            throw new TaskValidationException("Identifiers are required");
         }
         TaskSpaceAccess membership = access.getIfAvailable();
         if (membership == null) {

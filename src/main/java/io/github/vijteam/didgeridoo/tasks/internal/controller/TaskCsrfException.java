@@ -1,4 +1,10 @@
 package io.github.vijteam.didgeridoo.tasks.internal.controller;
 
-/** Reported by the shared-security adapter; token values must not be included. */
-public class TaskCsrfException extends RuntimeException {}
+import io.github.vijteam.didgeridoo.shared.ApiErrorCode;
+import io.github.vijteam.didgeridoo.shared.ApplicationException;
+
+public class TaskCsrfException extends ApplicationException {
+    public TaskCsrfException() {
+        super(ApiErrorCode.INVALID_CSRF_TOKEN, "CSRF token is invalid");
+    }
+}

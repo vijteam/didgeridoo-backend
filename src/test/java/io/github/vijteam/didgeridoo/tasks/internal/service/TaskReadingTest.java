@@ -6,7 +6,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
 import io.github.vijteam.didgeridoo.TestcontainersConfiguration;
+import io.github.vijteam.didgeridoo.shared.ApplicationException;
 import io.github.vijteam.didgeridoo.tasks.api.StatusInitializer;
+import io.github.vijteam.didgeridoo.tasks.internal.error.TaskAccessException;
+import io.github.vijteam.didgeridoo.tasks.internal.error.TaskNotFoundException;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,7 +21,6 @@ import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
-import java.util.NoSuchElementException;
 import java.util.UUID;
 
 @SpringBootTest
@@ -62,29 +64,29 @@ class TaskReadingTest {
     @Test
     void outsiderCannotReadEvenEmptyList() {
         when(access.roleOf(space, actor)).thenReturn(null);
-        assertThrows(SecurityException.class, () -> reading.get(space, actor, task));
-        assertThrows(SecurityException.class, () -> reading.list(space, actor, 0, 20));
+        assertThrows(TaskAccessException.class, () -> reading.get(space, actor, task));
+        assertThrows(TaskAccessException.class, () -> reading.list(space, actor, 0, 20));
         UUID emptySpace = UUID.randomUUID();
         initializer.initialize(emptySpace);
         when(access.roleOf(emptySpace, actor)).thenReturn(null);
-        assertThrows(SecurityException.class, () -> reading.list(emptySpace, actor, 0, 20));
+        assertThrows(TaskAccessException.class, () -> reading.list(emptySpace, actor, 0, 20));
     }
 
     @Test
     void doesNotReadTaskThroughAnotherSpace() {
         UUID other = UUID.randomUUID();
         when(access.roleOf(other, actor)).thenReturn(TaskSpaceAccess.Role.MEMBER);
-        assertThrows(NoSuchElementException.class, () -> reading.get(other, actor, task));
+        assertThrows(TaskNotFoundException.class, () -> reading.get(other, actor, task));
         assertTrue(reading.list(other, actor, 0, 20).isEmpty());
         assertThrows(
-                NoSuchElementException.class, () -> reading.get(other, actor, UUID.randomUUID()));
+                TaskNotFoundException.class, () -> reading.get(other, actor, UUID.randomUUID()));
     }
 
     @Test
     void checksCurrentMembershipOnEveryCall() {
         reading.get(space, actor, task);
         when(access.roleOf(space, actor)).thenReturn(null);
-        assertThrows(SecurityException.class, () -> reading.get(space, actor, task));
+        assertThrows(TaskAccessException.class, () -> reading.get(space, actor, task));
     }
 
     @Test
@@ -101,11 +103,11 @@ class TaskReadingTest {
 
     @Test
     void rejectsInvalidPaginationAndIdentifiers() {
-        assertThrows(IllegalArgumentException.class, () -> reading.list(space, actor, -1, 20));
-        assertThrows(IllegalArgumentException.class, () -> reading.list(space, actor, 0, 0));
-        assertThrows(IllegalArgumentException.class, () -> reading.list(space, actor, 0, 101));
-        assertThrows(IllegalArgumentException.class, () -> reading.get(space, actor, null));
-        assertThrows(IllegalArgumentException.class, () -> reading.get(null, actor, task));
-        assertThrows(IllegalArgumentException.class, () -> reading.list(space, null, 0, 20));
+        assertThrows(ApplicationException.class, () -> reading.list(space, actor, -1, 20));
+        assertThrows(ApplicationException.class, () -> reading.list(space, actor, 0, 0));
+        assertThrows(ApplicationException.class, () -> reading.list(space, actor, 0, 101));
+        assertThrows(ApplicationException.class, () -> reading.get(space, actor, null));
+        assertThrows(ApplicationException.class, () -> reading.get(null, actor, task));
+        assertThrows(ApplicationException.class, () -> reading.list(space, null, 0, 20));
     }
 }

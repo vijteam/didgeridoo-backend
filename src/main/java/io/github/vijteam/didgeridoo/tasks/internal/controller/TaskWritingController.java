@@ -1,7 +1,8 @@
 package io.github.vijteam.didgeridoo.tasks.internal.controller;
 
+import io.github.vijteam.didgeridoo.shared.FieldErrorCode;
+import io.github.vijteam.didgeridoo.shared.FieldValidationException;
 import io.github.vijteam.didgeridoo.tasks.internal.error.TaskDependencyException;
-import io.github.vijteam.didgeridoo.tasks.internal.error.TaskValidationException;
 import io.github.vijteam.didgeridoo.tasks.internal.service.TaskCreationService;
 import io.github.vijteam.didgeridoo.tasks.internal.service.TaskDeletionService;
 import io.github.vijteam.didgeridoo.tasks.internal.service.TaskEditingService;
@@ -55,7 +56,7 @@ public class TaskWritingController {
         this.security = security;
     }
 
-    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
+    @PostMapping
     public ResponseEntity<TaskView> create(
             @PathVariable UUID spaceId,
             @RequestBody String body,
@@ -68,7 +69,7 @@ public class TaskWritingController {
         return ResponseEntity.created(location).body(task);
     }
 
-    @PatchMapping(value = "/{taskId}", consumes = MediaType.APPLICATION_JSON_VALUE)
+    @PatchMapping("/{taskId}")
     public TaskView patch(
             @PathVariable UUID spaceId,
             @PathVariable UUID taskId,
@@ -80,7 +81,7 @@ public class TaskWritingController {
         return editing.patch(spaceId, actor, taskId, parser.patch(body));
     }
 
-    @PutMapping(value = "/{taskId}/status", consumes = MediaType.APPLICATION_JSON_VALUE)
+    @PutMapping("/{taskId}/status")
     public TaskView status(
             @PathVariable UUID spaceId,
             @PathVariable UUID taskId,
@@ -99,11 +100,8 @@ public class TaskWritingController {
             @RequestParam MultiValueMap<String, String> query,
             HttpServletRequest request) {
         UUID actor = actor(request);
-        validateQuery(query, Set.of("confirmed"));
-        if (!"true".equals(query.getFirst("confirmed"))) {
-            throw new TaskValidationException("confirmed", "Deletion confirmation is required");
-        }
-        deletion.delete(spaceId, actor, taskId, true);
+        validateQuery(query, Set.of());
+        deletion.delete(spaceId, actor, taskId);
         return ResponseEntity.noContent().build();
     }
 
@@ -121,6 +119,17 @@ public class TaskWritingController {
         if (actor == null) {
             throw new TaskAuthenticationException();
         }
+        if (!"DELETE".equals(request.getMethod())) {
+            try {
+                if (request.getContentType() == null
+                        || !MediaType.APPLICATION_JSON.includes(
+                                MediaType.parseMediaType(request.getContentType()))) {
+                    throw new TaskMediaTypeException();
+                }
+            } catch (org.springframework.http.InvalidMediaTypeException failure) {
+                throw new TaskMediaTypeException();
+            }
+        }
         return actor;
     }
 
@@ -128,8 +137,10 @@ public class TaskWritingController {
         query.forEach(
                 (field, values) -> {
                     if (!allowed.contains(field) || values.size() != 1 || values.get(0).isBlank()) {
-                        throw new TaskValidationException(
-                                field, "Unknown, empty or repeated query parameter");
+                        throw new FieldValidationException(
+                                field,
+                                FieldErrorCode.INVALID_FORMAT,
+                                "Unknown, empty or repeated query parameter");
                     }
                 });
     }

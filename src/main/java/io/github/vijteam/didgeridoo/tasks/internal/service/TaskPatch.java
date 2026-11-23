@@ -1,5 +1,7 @@
 package io.github.vijteam.didgeridoo.tasks.internal.service;
 
+import io.github.vijteam.didgeridoo.shared.FieldErrorCode;
+import io.github.vijteam.didgeridoo.shared.FieldValidationException;
 import io.github.vijteam.didgeridoo.tasks.internal.error.TaskValidationException;
 import io.github.vijteam.didgeridoo.tasks.internal.model.Task;
 import io.github.vijteam.didgeridoo.tasks.internal.model.TaskPriority;
@@ -28,7 +30,8 @@ public record TaskPatch(
 
     private static void requireNonNullValue(Field<?> field, String name) {
         if (field != null && field.value() == null) {
-            throw new TaskValidationException(name, name + " cannot be null");
+            throw new FieldValidationException(
+                    name, FieldErrorCode.REQUIRED, "Field cannot be null");
         }
     }
 
