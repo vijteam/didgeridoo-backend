@@ -4,7 +4,11 @@ import io.github.vijteam.didgeridoo.tasks.api.StatusTaskCount;
 import io.github.vijteam.didgeridoo.tasks.internal.model.StatusKind;
 import io.github.vijteam.didgeridoo.tasks.internal.model.TaskStatus;
 
+import jakarta.persistence.LockModeType;
+
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 
 import java.util.List;
@@ -19,6 +23,18 @@ public interface TaskStatusRepository extends JpaRepository<TaskStatus, UUID> {
     Optional<TaskStatus> findFirstBySpaceIdAndKindOrderByPositionAsc(UUID spaceId, StatusKind kind);
 
     List<TaskStatus> findAllBySpaceIdOrderByPositionAsc(UUID spaceId);
+
+    @Lock(LockModeType.PESSIMISTIC_READ)
+    @Query("select s from TaskStatus s where s.spaceId = :spaceId and s.kind = INITIAL")
+    Optional<TaskStatus> lockInitialForRead(UUID spaceId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select s from TaskStatus s where s.spaceId = :spaceId and s.kind = INITIAL")
+    Optional<TaskStatus> lockInitialForWrite(UUID spaceId);
+
+    @Modifying
+    @Query("delete from TaskStatus s where s.spaceId = :spaceId")
+    void deleteSpaceStatuses(UUID spaceId);
 
     @Query(
             """

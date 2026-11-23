@@ -59,6 +59,10 @@ public class TaskStatus {
         this.name = TaskFieldValidator.text(name, 100, "status name");
     }
 
+    public void moveTo(int position) {
+        this.position = position;
+    }
+
     public UUID getId() {
         return id;
     }
