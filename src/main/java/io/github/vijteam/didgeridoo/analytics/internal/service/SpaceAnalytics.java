@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.UUID;
 
 @Service
@@ -24,12 +25,15 @@ public class SpaceAnalytics {
         this.tasks = tasks;
     }
 
-    public AnalyticsSnapshot forSpace(UUID actorId, UUID spaceId) {
+    public AnalyticsSnapshot forSpace(UUID actorId, UUID spaceId, Instant from, Instant to) {
         access.requireMember(spaceId, actorId);
-        return AnalyticsSnapshot.from(tasks.countByStatus(spaceId));
+        return AnalyticsSnapshot.from(
+                tasks.metrics(spaceId, null, from, to, Instant.now()),
+                tasks.countByStatus(spaceId));
     }
 
-    public AnalyticsSnapshot forMember(UUID actorId, UUID spaceId, UUID userId) {
+    public AnalyticsSnapshot forMember(
+            UUID actorId, UUID spaceId, UUID userId, Instant from, Instant to) {
         SpaceRole role = access.findRole(spaceId, actorId).orElseThrow(SpaceNotFoundException::new);
         boolean ownAnalytics = actorId.equals(userId);
         if (role == SpaceRole.GUEST || (role == SpaceRole.MEMBER && !ownAnalytics)) {
@@ -38,7 +42,9 @@ public class SpaceAnalytics {
         if (!ownAnalytics && !access.isAssignable(spaceId, userId)) {
             throw new SpaceNotFoundException();
         }
-        return AnalyticsSnapshot.from(tasks.countByStatusForAssignee(spaceId, userId));
+        return AnalyticsSnapshot.from(
+                tasks.metrics(spaceId, userId, from, to, Instant.now()),
+                tasks.countByStatusForAssignee(spaceId, userId));
     }
 
     private static class AnalyticsAccessDeniedException extends ApplicationException {

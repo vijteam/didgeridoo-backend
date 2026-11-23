@@ -87,14 +87,20 @@ public class SpaceMembershipWorkflow {
 
     @Transactional
     public Departure depart(
-            UUID actor, UUID spaceId, UUID requestId, UUID successor, boolean deleteSpace) {
+            UUID actor,
+            UUID spaceId,
+            UUID requestId,
+            UUID successor,
+            boolean deleteSpace,
+            boolean allowAutomaticDeletion) {
         departures.lock(actor, requestId);
         var previous = departures.find(actor, requestId);
         if (previous.isPresent()) {
             var stored = previous.orElseThrow();
             if (!stored.result().spaceId().equals(spaceId)
                     || !Objects.equals(stored.requestedSuccessor(), successor)
-                    || stored.requestedDeletion() != deleteSpace) {
+                    || stored.requestedDeletion() != deleteSpace
+                    || stored.allowAutomaticDeletion() != allowAutomaticDeletion) {
                 throw new MembershipConflict(
                         ApiErrorCode.IDEMPOTENCY_CONFLICT,
                         "Request key was used for a different departure");
@@ -103,12 +109,17 @@ public class SpaceMembershipWorkflow {
         }
 
         members.lockSpace(spaceId);
-        Departure result = leave(actor, spaceId, successor, deleteSpace);
-        departures.save(actor, requestId, successor, deleteSpace, result);
+        Departure result = leave(actor, spaceId, successor, deleteSpace, allowAutomaticDeletion);
+        departures.save(actor, requestId, successor, deleteSpace, allowAutomaticDeletion, result);
         return result;
     }
 
-    private Departure leave(UUID actor, UUID spaceId, UUID successor, boolean deleteSpace) {
+    private Departure leave(
+            UUID actor,
+            UUID spaceId,
+            UUID successor,
+            boolean deleteSpace,
+            boolean allowAutomaticDeletion) {
         if (role(spaceId, actor) != SpaceRole.OWNER || !lastOwner(spaceId)) {
             if (successor != null || deleteSpace) {
                 throw new MembershipConflict(
@@ -131,6 +142,10 @@ public class SpaceMembershipWorkflow {
         }
         if (!deleteSpace && members.count(spaceId, SpaceRole.MEMBER) != 0) {
             throw lastOwnerConflict();
+        }
+        if (!deleteSpace && !allowAutomaticDeletion) {
+            throw new MembershipConflict(
+                    ApiErrorCode.MEMBERSHIP_CHANGE_CONFLICT, "Confirm deletion of the space");
         }
         tasks.deleteSpaceData(spaceId);
         members.deleteSpace(spaceId);

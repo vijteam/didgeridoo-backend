@@ -14,6 +14,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.security.Principal;
+import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.UUID;
 
 @RestController
@@ -33,8 +35,8 @@ public class AnalyticsController {
             @PathVariable String spaceId,
             @RequestParam MultiValueMap<String, String> query) {
         UUID actorId = actors.requireUser(principal);
-        rejectQueryParameters(query);
-        return analytics.forSpace(actorId, uuid(spaceId, "spaceId"));
+        Period period = period(query);
+        return analytics.forSpace(actorId, uuid(spaceId, "spaceId"), period.from(), period.to());
     }
 
     @GetMapping("/memberships/{userId}/analytics")
@@ -44,15 +46,52 @@ public class AnalyticsController {
             @PathVariable String userId,
             @RequestParam MultiValueMap<String, String> query) {
         UUID actorId = actors.requireUser(principal);
-        rejectQueryParameters(query);
-        return analytics.forMember(actorId, uuid(spaceId, "spaceId"), uuid(userId, "userId"));
+        Period period = period(query);
+        return analytics.forMember(
+                actorId,
+                uuid(spaceId, "spaceId"),
+                uuid(userId, "userId"),
+                period.from(),
+                period.to());
     }
 
-    private static void rejectQueryParameters(MultiValueMap<String, String> query) {
-        if (!query.isEmpty()) {
-            throw new FieldValidationException(
-                    "query", FieldErrorCode.UNKNOWN_FIELD, "Query parameters are not supported");
+    private record Period(Instant from, Instant to) {}
+
+    private static Period period(MultiValueMap<String, String> query) {
+        if (query.isEmpty()) {
+            return new Period(null, null);
         }
+        query.forEach(
+                (field, values) -> {
+                    if (!field.equals("from") && !field.equals("to")) {
+                        throw new FieldValidationException(
+                                field, FieldErrorCode.UNKNOWN_FIELD, "Unknown parameter");
+                    }
+                    if (values.size() != 1) {
+                        throw invalidPeriod(field, "Parameter must appear once");
+                    }
+                });
+        Instant from = instant(query.getFirst("from"), "from");
+        Instant to = instant(query.getFirst("to"), "to");
+        if (!from.isBefore(to)) {
+            throw invalidPeriod("to", "End must come after start");
+        }
+        return new Period(from, to);
+    }
+
+    private static Instant instant(String value, String field) {
+        if (value == null || !value.matches("[0-9]{4}-.*Z")) {
+            throw invalidPeriod(field, "UTC timestamp is required");
+        }
+        try {
+            return Instant.parse(value);
+        } catch (DateTimeParseException ex) {
+            throw invalidPeriod(field, "Invalid UTC timestamp");
+        }
+    }
+
+    private static FieldValidationException invalidPeriod(String field, String message) {
+        return new FieldValidationException(field, FieldErrorCode.INVALID_FORMAT, message);
     }
 
     private static UUID uuid(String value, String field) {

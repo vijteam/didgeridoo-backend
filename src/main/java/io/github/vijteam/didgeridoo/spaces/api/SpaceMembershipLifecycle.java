@@ -1,10 +1,18 @@
 package io.github.vijteam.didgeridoo.spaces.api;
 
+import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 /** Membership operations within a workflow transaction. Lock the space before checking roles. */
 public interface SpaceMembershipLifecycle {
     void lockSpace(UUID spaceId);
+
+    /** Returns memberships in a consistent order for locking multiple spaces. */
+    List<UUID> spacesForUser(UUID userId);
+
+    /** Chooses the first MEMBER by join time and ID, then the first GUEST, under the space lock. */
+    Optional<UUID> successor(UUID spaceId, UUID departingUserId);
 
     long count(UUID spaceId, SpaceRole role);
 

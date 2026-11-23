@@ -26,7 +26,11 @@ public class SpaceRequestParser {
 
     public record RoleChange(SpaceRole role, Long affectedCount) {}
 
-    public record Departure(UUID requestId, UUID successorId, boolean deleteSpace) {}
+    public record Departure(
+            UUID requestId,
+            UUID successorId,
+            boolean deleteSpace,
+            boolean allowAutomaticDeletion) {}
 
     private final JsonMapper mapper =
             JsonMapper.builder()
@@ -98,7 +102,8 @@ public class SpaceRequestParser {
 
     public Departure departure(String body, String key, MultiValueMap<String, String> query) {
         validateQuery(query, Set.of());
-        JsonNode json = object(body, Set.of("successorId", "deleteSpace"));
+        JsonNode json =
+                object(body, Set.of("successorId", "deleteSpace", "allowAutomaticDeletion"));
         if (json.has("deleteSpace") && !json.get("deleteSpace").isBoolean()) {
             throw invalid("deleteSpace", "Expected a boolean");
         }
@@ -110,7 +115,14 @@ public class SpaceRequestParser {
         if (deleteSpace && successor != null) {
             throw invalid("successorId", "Choose transfer or deletion");
         }
-        return new Departure(uuid(key, "Idempotency-Key"), successor, deleteSpace);
+        if (json.has("allowAutomaticDeletion") && !json.get("allowAutomaticDeletion").isBoolean()) {
+            throw invalid("allowAutomaticDeletion", "Expected a boolean");
+        }
+        boolean allowAutomaticDeletion =
+                !json.has("allowAutomaticDeletion")
+                        || json.get("allowAutomaticDeletion").asBoolean();
+        return new Departure(
+                uuid(key, "Idempotency-Key"), successor, deleteSpace, allowAutomaticDeletion);
     }
 
     private String requiredString(JsonNode json, String field) {
