@@ -69,6 +69,10 @@ public class TaskRequestParser {
         return uuid(object(body, Set.of("statusId")), "statusId", false);
     }
 
+    public void claim(String body) {
+        object(body, Set.of());
+    }
+
     private JsonNode object(String body, Set<String> allowed) {
         if (body == null || body.isBlank()) {
             throw new TaskMalformedJsonException();

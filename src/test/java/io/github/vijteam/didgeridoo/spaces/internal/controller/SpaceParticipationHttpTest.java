@@ -14,6 +14,7 @@ import io.github.vijteam.didgeridoo.spaces.api.SpaceRole;
 import io.github.vijteam.didgeridoo.tasks.internal.error.TaskAccessException;
 import io.github.vijteam.didgeridoo.tasks.internal.model.AssignmentSource;
 import io.github.vijteam.didgeridoo.tasks.internal.service.TaskAssignmentService;
+import io.github.vijteam.didgeridoo.tasks.internal.service.TaskTagService;
 
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -47,6 +48,7 @@ class SpaceParticipationHttpTest {
     @Autowired UserRepository users;
     @Autowired JdbcTemplate jdbc;
     @Autowired TaskAssignmentService assignments;
+    @Autowired TaskTagService tags;
     @Autowired TransactionTemplate transaction;
     MockMvc mvc;
     User owner;
@@ -192,24 +194,58 @@ class SpaceParticipationHttpTest {
                         UUID.class,
                         owner.getId(),
                         space);
-        assertThrows(
-                TaskAccessException.class,
-                () -> assignments.claim(space, recipient.getId(), taskId));
+        String claim = "/api/v1/spaces/" + space + "/tasks/" + taskId + "/claim";
+        mvc.perform(
+                        post(claim)
+                                .session(login(recipient))
+                                .with(csrf().asHeader())
+                                .contentType("application/json")
+                                .content("{}"))
+                .andExpect(status().isNotFound());
+
+        mvc.perform(
+                        post(claim)
+                                .with(csrf().asHeader())
+                                .contentType("application/json")
+                                .content("{}"))
+                .andExpect(status().isUnauthorized());
 
         decide(recipient, invitationId, "ACCEPTED").andExpect(status().isOk());
-        var claimed = assignments.claim(space, recipient.getId(), taskId);
-        assertEquals(recipient.getId(), claimed.assigneeId());
-        assertEquals(AssignmentSource.SELF_CLAIM, claimed.assignmentSource());
+        mvc.perform(
+                        post(claim)
+                                .session(login(recipient))
+                                .contentType("application/json")
+                                .content("{}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("INVALID_CSRF_TOKEN"));
+        mvc.perform(
+                        post(claim)
+                                .session(login(recipient))
+                                .with(csrf().asHeader())
+                                .contentType("application/json")
+                                .content("{}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.assigneeId").value(recipient.getId().toString()))
+                .andExpect(
+                        jsonPath("$.assignmentSource").value(AssignmentSource.SELF_CLAIM.name()));
+        mvc.perform(
+                        post(claim)
+                                .session(login(recipient))
+                                .with(csrf().asHeader())
+                                .contentType("application/json")
+                                .content("{}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("TASK_ASSIGNMENT_CONFLICT"));
         assertEquals(
                 recipient.getId(),
                 jdbc.queryForObject(
                         "SELECT actor_user_id FROM task_changes WHERE task_id=? AND kind='UPDATED'",
                         UUID.class,
                         taskId));
-
-        var released = assignments.release(space, recipient.getId(), taskId);
-        assertNull(released.assigneeId());
-        assertNull(released.assignmentSource());
+        mvc.perform(delete(claim).session(login(recipient)).with(csrf().asHeader()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.assigneeId").isEmpty());
+        assertNull(assignee(taskId));
     }
 
     @Test
@@ -236,8 +272,8 @@ class SpaceParticipationHttpTest {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("LAST_OWNER"));
         changeRole(owner, recipient, SpaceRole.GUEST)
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("MEMBERSHIP_CHANGE_UNAVAILABLE"));
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("affectedCount"));
         changeRole(owner, guest, SpaceRole.MEMBER)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.userId").value(guest.getId().toString()))
@@ -247,6 +283,210 @@ class SpaceParticipationHttpTest {
         changeRole(owner, guest, SpaceRole.OWNER).andExpect(status().isOk());
         changeRole(guest, owner, SpaceRole.MEMBER).andExpect(status().isOk());
         changeRole(owner, recipient, SpaceRole.OWNER).andExpect(status().isForbidden());
+    }
+
+    @Test
+    void guestDemotionCountsAssignmentsAndRollsBackStaleConfirmation() throws Exception {
+        member(recipient, space, "MEMBER");
+        UUID task = claimFixture(recipient);
+        String path = membershipPath(recipient);
+        mvc.perform(get(path + "/assignment-impact").session(login(recipient)))
+                .andExpect(status().isForbidden());
+        mvc.perform(get(path + "/assignment-impact").session(login(owner)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.affectedCount").value(1));
+        setGuest(path, 0)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("MEMBERSHIP_CHANGE_CONFLICT"));
+        assertEquals(recipient.getId(), assignee(task));
+        assertEquals(1L, history(task));
+
+        setGuest(path, 1).andExpect(status().isOk()).andExpect(jsonPath("$.role").value("GUEST"));
+        assertNull(assignee(task));
+        assertEquals(2L, history(task));
+        assertThrows(
+                TaskAccessException.class, () -> assignments.claim(space, recipient.getId(), task));
+        setGuest(path, 1).andExpect(status().isOk());
+        assertEquals(2L, history(task));
+    }
+
+    @Test
+    void concurrentClaimRechecksMembershipAfterGuestDemotionCommits() throws Exception {
+        member(recipient, space, "MEMBER");
+        UUID task = claimFixture(recipient);
+        assignments.release(space, recipient.getId(), task);
+        try (var executor = Executors.newSingleThreadExecutor()) {
+            var blockedClaim =
+                    transaction.execute(
+                            status -> {
+                                assertDoesNotThrow(
+                                        () ->
+                                                setGuest(membershipPath(recipient), 0)
+                                                        .andExpect(status().isOk()));
+                                int blocker =
+                                        jdbc.queryForObject(
+                                                "SELECT pg_backend_pid()", Integer.class);
+                                var pending =
+                                        executor.submit(
+                                                () ->
+                                                        assignments.claim(
+                                                                space, recipient.getId(), task));
+                                awaitRequestBlockedBy(blocker);
+                                return pending;
+                            });
+            var failure =
+                    assertThrows(
+                            ExecutionException.class, () -> blockedClaim.get(20, TimeUnit.SECONDS));
+            assertInstanceOf(TaskAccessException.class, failure.getCause());
+        }
+        assertNull(assignee(task));
+        assertEquals(2L, history(task));
+    }
+
+    @Test
+    void exclusionClearsAssignmentsAndRetainsTaskAndHistory() throws Exception {
+        member(recipient, space, "MEMBER");
+        UUID task = claimFixture(recipient);
+        String path = membershipPath(recipient);
+        mvc.perform(delete(path).session(login(recipient)).with(csrf().asHeader()))
+                .andExpect(status().isForbidden());
+        mvc.perform(delete(membershipPath(owner)).session(login(owner)).with(csrf().asHeader()))
+                .andExpect(status().isBadRequest());
+        mvc.perform(delete(path).session(login(owner)).with(csrf().asHeader()))
+                .andExpect(status().isNoContent());
+        assertEquals(0, membership(recipient));
+        assertNull(assignee(task));
+        assertEquals(2L, history(task));
+    }
+
+    @Test
+    void ownerDepartureTransfersOwnershipAndReplaysTheStoredResult() throws Exception {
+        member(recipient, space, "MEMBER");
+        UUID task = claimFixture(owner);
+        String key = UUID.randomUUID().toString();
+        depart(owner, UUID.randomUUID().toString(), "{}")
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("LAST_OWNER"));
+        String transfer = "{\"successorId\":\"" + recipient.getId() + "\"}";
+        for (int attempt = 0; attempt < 2; attempt++) {
+            depart(owner, key, transfer)
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.outcome").value("TRANSFERRED"))
+                    .andExpect(jsonPath("$.successorId").value(recipient.getId().toString()));
+        }
+        depart(owner, key, "{}")
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("IDEMPOTENCY_CONFLICT"));
+        assertEquals(0, membership(owner));
+        assertNull(assignee(task));
+        assertEquals(2L, history(task));
+        mvc.perform(get(membershipPath(recipient) + "/assignment-impact").session(login(recipient)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void departureWaitsForConcurrentTagCreationWithoutBlockingItsForeignKey() throws Exception {
+        try (var executor = Executors.newSingleThreadExecutor()) {
+            var departure =
+                    transaction.execute(
+                            status -> {
+                                jdbc.queryForObject(
+                                        "SELECT id FROM task_statuses WHERE space_id = ? AND kind = 'INITIAL' FOR UPDATE",
+                                        UUID.class,
+                                        space);
+                                int blocker =
+                                        jdbc.queryForObject(
+                                                "SELECT pg_backend_pid()", Integer.class);
+                                var pending =
+                                        executor.submit(
+                                                () ->
+                                                        depart(
+                                                                owner,
+                                                                UUID.randomUUID().toString(),
+                                                                "{}"));
+                                awaitRequestBlockedBy(blocker);
+                                jdbc.execute("SET LOCAL lock_timeout = '5s'");
+                                tags.create(space, owner.getId(), "During departure");
+                                return pending;
+                            });
+            departure
+                    .get(20, TimeUnit.SECONDS)
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.outcome").value("SPACE_DELETED"));
+        }
+        assertEquals(
+                0L,
+                jdbc.queryForObject(
+                        "SELECT count(*) FROM space_tags WHERE space_id = ?", Long.class, space));
+    }
+
+    @Test
+    void guestCanLeaveAndLastOwnerDeletesSpaceWithOnlyGuests() throws Exception {
+        member(guest, space, "GUEST");
+        member(recipient, space, "GUEST");
+        UUID task = claimFixture(owner);
+        depart(guest, UUID.randomUUID().toString(), "{}")
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.outcome").value("LEFT"));
+        assertEquals(0, membership(guest));
+        String key = UUID.randomUUID().toString();
+        for (int attempt = 0; attempt < 2; attempt++) {
+            depart(owner, key, "{}")
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.outcome").value("SPACE_DELETED"));
+        }
+        assertEquals(0, membership(recipient));
+        assertEquals(0L, history(task));
+        assertEquals(
+                0L,
+                jdbc.queryForObject("SELECT count(*) FROM spaces WHERE id=?", Long.class, space));
+        assertEquals(
+                0L, jdbc.queryForObject("SELECT count(*) FROM tasks WHERE id=?", Long.class, task));
+    }
+
+    private ResultActions setGuest(String path, long count) throws Exception {
+        return mvc.perform(
+                patch(path)
+                        .session(login(owner))
+                        .with(csrf().asHeader())
+                        .contentType("application/json")
+                        .content("{\"role\":\"GUEST\",\"affectedCount\":" + count + "}"));
+    }
+
+    private ResultActions depart(User actor, String key, String body) throws Exception {
+        return mvc.perform(
+                post("/api/v1/spaces/" + space + "/departures")
+                        .session(login(actor))
+                        .with(csrf().asHeader())
+                        .header("Idempotency-Key", key)
+                        .contentType("application/json")
+                        .content(body));
+    }
+
+    private UUID claimFixture(User actor) {
+        UUID task =
+                jdbc.queryForObject(
+                        """
+                INSERT INTO tasks(space_id, creator_user_id, status_id, title)
+                SELECT space_id, ?, id, 'Membership assignment'
+                FROM task_statuses WHERE space_id = ? AND kind = 'INITIAL'
+                RETURNING id
+                """,
+                        UUID.class,
+                        owner.getId(),
+                        space);
+        assignments.claim(space, actor.getId(), task);
+        return task;
+    }
+
+    private UUID assignee(UUID task) {
+        return jdbc.queryForObject(
+                "SELECT assignee_user_id FROM tasks WHERE id=?", UUID.class, task);
+    }
+
+    private long history(UUID task) {
+        return jdbc.queryForObject(
+                "SELECT count(*) FROM task_changes WHERE task_id=?", Long.class, task);
     }
 
     @Test
