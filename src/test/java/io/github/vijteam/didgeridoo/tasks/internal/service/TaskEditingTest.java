@@ -7,7 +7,10 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 
 import io.github.vijteam.didgeridoo.TestcontainersConfiguration;
+import io.github.vijteam.didgeridoo.shared.ApplicationException;
 import io.github.vijteam.didgeridoo.tasks.api.StatusInitializer;
+import io.github.vijteam.didgeridoo.tasks.internal.error.TaskAccessException;
+import io.github.vijteam.didgeridoo.tasks.internal.error.TaskNotFoundException;
 import io.github.vijteam.didgeridoo.tasks.internal.model.TaskPriority;
 import io.github.vijteam.didgeridoo.tasks.internal.repository.TaskChangeRepository;
 
@@ -20,7 +23,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
-import java.util.NoSuchElementException;
 import java.util.UUID;
 
 @SpringBootTest
@@ -113,28 +115,28 @@ class TaskEditingTest {
     @Test
     void unrelatedMemberCannotEdit() {
         assertThrows(
-                SecurityException.class, () -> editing.edit(space, other, task, command(null)));
+                TaskAccessException.class, () -> editing.edit(space, other, task, command(null)));
     }
 
     @Test
     void assigneeNeedsPermissionAndCannotChangePermissionFlag() {
         jdbc.update("UPDATE tasks SET assignee_user_id=? WHERE id=?", other, task);
         assertThrows(
-                SecurityException.class, () -> editing.edit(space, other, task, command(null)));
+                TaskAccessException.class, () -> editing.edit(space, other, task, command(null)));
         jdbc.update("UPDATE tasks SET assignee_can_edit=true WHERE id=?", task);
         assertEquals("After", editing.edit(space, other, task, command(null)).title());
         assertThrows(
-                SecurityException.class, () -> editing.edit(space, other, task, command(false)));
+                TaskAccessException.class, () -> editing.edit(space, other, task, command(false)));
     }
 
     @Test
     void guestOrFormerCreatorCannotEdit() {
         when(access.roleOf(space, creator)).thenReturn(TaskSpaceAccess.Role.GUEST);
         assertThrows(
-                SecurityException.class, () -> editing.edit(space, creator, task, command(null)));
+                TaskAccessException.class, () -> editing.edit(space, creator, task, command(null)));
         when(access.roleOf(space, creator)).thenReturn(null);
         assertThrows(
-                SecurityException.class, () -> editing.edit(space, creator, task, command(null)));
+                TaskAccessException.class, () -> editing.edit(space, creator, task, command(null)));
     }
 
     @Test
@@ -142,7 +144,7 @@ class TaskEditingTest {
         UUID different = UUID.randomUUID();
         when(access.roleOf(different, creator)).thenReturn(TaskSpaceAccess.Role.OWNER);
         assertThrows(
-                NoSuchElementException.class,
+                TaskNotFoundException.class,
                 () -> editing.edit(different, creator, task, command(null)));
     }
 
@@ -176,7 +178,7 @@ class TaskEditingTest {
     @Test
     void invalidTitleDoesNotChangeTask() {
         assertThrows(
-                IllegalArgumentException.class,
+                ApplicationException.class,
                 () ->
                         editing.edit(
                                 space,
@@ -223,16 +225,15 @@ class TaskEditingTest {
 
     @Test
     void rejectsEmptyPatchAndNullRequiredFields() {
+        assertThrows(ApplicationException.class, () -> new TaskPatch(null, null, null, null, null));
         assertThrows(
-                IllegalArgumentException.class, () -> new TaskPatch(null, null, null, null, null));
-        assertThrows(
-                IllegalArgumentException.class,
+                ApplicationException.class,
                 () -> new TaskPatch(TaskPatch.Field.of(null), null, null, null, null));
         assertThrows(
-                IllegalArgumentException.class,
+                ApplicationException.class,
                 () -> new TaskPatch(null, null, null, TaskPatch.Field.of(null), null));
         assertThrows(
-                IllegalArgumentException.class,
+                ApplicationException.class,
                 () -> new TaskPatch(null, null, null, null, TaskPatch.Field.of(null)));
     }
 
@@ -261,7 +262,7 @@ class TaskEditingTest {
                 other,
                 task);
         assertThrows(
-                SecurityException.class,
+                TaskAccessException.class,
                 () ->
                         editing.patch(
                                 space,

@@ -1,5 +1,7 @@
 package io.github.vijteam.didgeridoo.tasks.internal.service;
 
+import io.github.vijteam.didgeridoo.shared.FieldErrorCode;
+import io.github.vijteam.didgeridoo.shared.FieldValidationException;
 import io.github.vijteam.didgeridoo.tasks.internal.error.TaskAccessException;
 import io.github.vijteam.didgeridoo.tasks.internal.error.TaskDependencyException;
 import io.github.vijteam.didgeridoo.tasks.internal.error.TaskNotFoundException;
@@ -40,6 +42,7 @@ public class TaskStatusChangeService {
         if (spaceId == null || actorId == null || taskId == null || statusId == null) {
             throw new TaskValidationException("spaceId, actorId, taskId and statusId are required");
         }
+        statuses.lockInitialForRead(spaceId);
         TaskSpaceAccess membership = access.getIfAvailable();
         if (membership == null) {
             throw new TaskDependencyException(
@@ -68,8 +71,10 @@ public class TaskStatusChangeService {
         statuses.findByIdAndSpaceId(statusId, spaceId)
                 .orElseThrow(
                         () ->
-                                new TaskValidationException(
-                                        "statusId", "Status does not belong to this space"));
+                                new FieldValidationException(
+                                        "statusId",
+                                        FieldErrorCode.INVALID_REFERENCE,
+                                        "Status does not belong to this space"));
         if (statusId.equals(task.getStatusId())) {
             return TaskView.from(task);
         }

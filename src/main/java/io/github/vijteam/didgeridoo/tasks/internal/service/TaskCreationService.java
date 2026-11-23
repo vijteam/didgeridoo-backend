@@ -1,10 +1,11 @@
 package io.github.vijteam.didgeridoo.tasks.internal.service;
 
+import io.github.vijteam.didgeridoo.shared.FieldErrorCode;
+import io.github.vijteam.didgeridoo.shared.FieldValidationException;
 import io.github.vijteam.didgeridoo.tasks.internal.error.TaskAccessException;
 import io.github.vijteam.didgeridoo.tasks.internal.error.TaskDependencyException;
 import io.github.vijteam.didgeridoo.tasks.internal.error.TaskValidationException;
 import io.github.vijteam.didgeridoo.tasks.internal.model.AssignmentSource;
-import io.github.vijteam.didgeridoo.tasks.internal.model.StatusKind;
 import io.github.vijteam.didgeridoo.tasks.internal.model.Task;
 import io.github.vijteam.didgeridoo.tasks.internal.model.TaskChange;
 import io.github.vijteam.didgeridoo.tasks.internal.model.TaskPriority;
@@ -12,11 +13,13 @@ import io.github.vijteam.didgeridoo.tasks.internal.model.TaskStatus;
 import io.github.vijteam.didgeridoo.tasks.internal.repository.TaskChangeRepository;
 import io.github.vijteam.didgeridoo.tasks.internal.repository.TaskRepository;
 import io.github.vijteam.didgeridoo.tasks.internal.repository.TaskStatusRepository;
+import io.github.vijteam.didgeridoo.tasks.internal.repository.TaskTagRepository;
 
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -25,16 +28,19 @@ public class TaskCreationService {
     private final TaskRepository tasks;
     private final TaskStatusRepository statuses;
     private final TaskChangeRepository changes;
+    private final TaskTagRepository tags;
     private final ObjectProvider<TaskSpaceAccess> access;
 
     public TaskCreationService(
             TaskRepository tasks,
             TaskStatusRepository statuses,
             TaskChangeRepository changes,
+            TaskTagRepository tags,
             ObjectProvider<TaskSpaceAccess> access) {
         this.tasks = tasks;
         this.statuses = statuses;
         this.changes = changes;
+        this.tags = tags;
         this.access = access;
     }
 
@@ -48,6 +54,7 @@ public class TaskCreationService {
         if (spaceId == null || actorId == null || command == null) {
             throw new TaskValidationException("spaceId, actorId and command are required");
         }
+        statuses.lockInitialForRead(spaceId);
         TaskSpaceAccess membership = access.getIfAvailable();
         if (membership == null) {
             throw new TaskDependencyException(
@@ -69,14 +76,15 @@ public class TaskCreationService {
             TaskSpaceAccess.Role assigneeRole = membership.roleOf(spaceId, command.assigneeId());
             if (assigneeRole != TaskSpaceAccess.Role.OWNER
                     && assigneeRole != TaskSpaceAccess.Role.MEMBER) {
-                throw new TaskValidationException(
-                        "assigneeId", "Assignee must be a member or owner");
+                throw new FieldValidationException(
+                        "assigneeId",
+                        FieldErrorCode.INVALID_REFERENCE,
+                        "Assignee must be a member or owner");
             }
         }
         TaskStatus status =
                 command.statusId() == null
-                        ? statuses.findFirstBySpaceIdAndKindOrderByPositionAsc(
-                                        spaceId, StatusKind.INITIAL)
+                        ? statuses.findFirstBySpaceIdOrderByPositionAsc(spaceId)
                                 .orElseThrow(
                                         () ->
                                                 new TaskDependencyException(
@@ -86,9 +94,13 @@ public class TaskCreationService {
                         : statuses.findByIdAndSpaceId(command.statusId(), spaceId)
                                 .orElseThrow(
                                         () ->
-                                                new TaskValidationException(
+                                                new FieldValidationException(
                                                         "statusId",
+                                                        FieldErrorCode.INVALID_REFERENCE,
                                                         "Status does not belong to this space"));
+        var selectedTags =
+                TaskTagSelection.resolve(
+                        tags, spaceId, command.tagIds() == null ? List.of() : command.tagIds());
         Task task = new Task(spaceId, actorId, status.getId(), command.title());
         task.updateDetails(
                 command.title(),
@@ -100,7 +112,10 @@ public class TaskCreationService {
             task.assign(command.assigneeId(), AssignmentSource.DIRECT);
         }
         tasks.saveAndFlush(task);
-        changes.saveAndFlush(TaskChange.created(task, actorId));
+        tags.insertLinks(spaceId, task.getId(), selectedTags);
+        var event = TaskChange.created(task, actorId);
+        selectedTags.forEach(tag -> event.recordTagChange(tag.id(), null, tag.name()));
+        changes.saveAndFlush(event);
         return TaskView.from(task);
     }
 }

@@ -97,6 +97,13 @@ public class TaskChange {
         return !changedFields.isEmpty();
     }
 
+    public void recordTagChange(UUID tagId, String oldName, String newName) {
+        Map<String, Object> values = new LinkedHashMap<>();
+        values.put("old", oldName);
+        values.put("new", newName);
+        changedFields.put("tags." + tagId, values);
+    }
+
     public UUID getId() {
         return id;
     }
