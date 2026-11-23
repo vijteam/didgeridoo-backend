@@ -9,6 +9,7 @@ import io.github.vijteam.didgeridoo.shared.ApplicationException;
 import io.github.vijteam.didgeridoo.tasks.internal.repository.TaskChangeRepository;
 import io.github.vijteam.didgeridoo.tasks.internal.repository.TaskRepository;
 import io.github.vijteam.didgeridoo.tasks.internal.repository.TaskStatusRepository;
+import io.github.vijteam.didgeridoo.tasks.internal.repository.TaskTagRepository;
 import io.github.vijteam.didgeridoo.tasks.internal.service.CreateTask;
 import io.github.vijteam.didgeridoo.tasks.internal.service.TaskCreationService;
 import io.github.vijteam.didgeridoo.tasks.internal.service.TaskReadingService;
@@ -49,7 +50,11 @@ class TaskErrorTest {
         when(access.roleOf(space, actor)).thenReturn(TaskSpaceAccess.Role.GUEST);
         var creation =
                 new TaskCreationService(
-                        tasks, statuses, mock(TaskChangeRepository.class), provider);
+                        tasks,
+                        statuses,
+                        mock(TaskChangeRepository.class),
+                        mock(TaskTagRepository.class),
+                        provider);
         assertEquals(
                 TaskAccessException.Reason.FORBIDDEN,
                 assertThrows(
@@ -80,7 +85,11 @@ class TaskErrorTest {
         when(access.roleOf(space, actor)).thenReturn(TaskSpaceAccess.Role.MEMBER);
         var creation =
                 new TaskCreationService(
-                        tasks, statuses, mock(TaskChangeRepository.class), provider);
+                        tasks,
+                        statuses,
+                        mock(TaskChangeRepository.class),
+                        mock(TaskTagRepository.class),
+                        provider);
         var command = new CreateTask("Task", null, null, null, null, null, false);
         assertEquals(
                 TaskDependencyException.Reason.INITIAL_STATUS_MISSING,
