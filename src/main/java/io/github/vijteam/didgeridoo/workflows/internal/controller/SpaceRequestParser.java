@@ -4,6 +4,7 @@ import io.github.vijteam.didgeridoo.shared.ApiErrorCode;
 import io.github.vijteam.didgeridoo.shared.FieldErrorCode;
 import io.github.vijteam.didgeridoo.shared.FieldValidationException;
 import io.github.vijteam.didgeridoo.spaces.api.SpaceName;
+import io.github.vijteam.didgeridoo.spaces.api.SpaceRole;
 
 import org.springframework.stereotype.Component;
 import org.springframework.util.MultiValueMap;
@@ -23,6 +24,10 @@ public class SpaceRequestParser {
 
     public record Search(String name, int page, int size) {}
 
+    public record RoleChange(SpaceRole role, Long affectedCount) {}
+
+    public record Departure(UUID requestId, UUID successorId, boolean deleteSpace) {}
+
     private final JsonMapper mapper =
             JsonMapper.builder()
                     .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
@@ -32,13 +37,7 @@ public class SpaceRequestParser {
     public Create create(String body, String key, MultiValueMap<String, String> query) {
         validateQuery(query, Set.of());
         UUID requestId = uuid(key, "Idempotency-Key");
-        JsonNode json = object(body);
-        for (String field : json.propertyNames()) {
-            if (!field.equals("name")) {
-                throw new FieldValidationException(
-                        field, FieldErrorCode.UNKNOWN_FIELD, "Unknown field");
-            }
-        }
+        JsonNode json = object(body, Set.of("name"));
         if (!json.hasNonNull("name")) {
             throw new FieldValidationException("name", FieldErrorCode.REQUIRED, "Name is required");
         }
@@ -70,7 +69,62 @@ public class SpaceRequestParser {
         return uuid(id, "spaceId");
     }
 
-    private JsonNode object(String body) {
+    public UUID memberId(String memberId, MultiValueMap<String, String> query) {
+        validateQuery(query, Set.of());
+        return uuid(memberId, "userId");
+    }
+
+    public RoleChange roleChange(String body) {
+        JsonNode json = object(body, Set.of("role", "affectedCount"));
+        String rawRole = requiredString(json, "role");
+        SpaceRole role;
+        try {
+            role = SpaceRole.valueOf(rawRole);
+        } catch (IllegalArgumentException failure) {
+            throw invalid("role", "Invalid role");
+        }
+        if (!json.has("affectedCount")) {
+            return new RoleChange(role, null);
+        }
+        JsonNode count = json.get("affectedCount");
+        if (role != SpaceRole.GUEST
+                || !count.isIntegralNumber()
+                || !count.canConvertToLong()
+                || count.asLong() < 0) {
+            throw invalid("affectedCount", "Use a nonnegative assignment count for GUEST");
+        }
+        return new RoleChange(role, count.asLong());
+    }
+
+    public Departure departure(String body, String key, MultiValueMap<String, String> query) {
+        validateQuery(query, Set.of());
+        JsonNode json = object(body, Set.of("successorId", "deleteSpace"));
+        if (json.has("deleteSpace") && !json.get("deleteSpace").isBoolean()) {
+            throw invalid("deleteSpace", "Expected a boolean");
+        }
+        boolean deleteSpace = json.has("deleteSpace") && json.get("deleteSpace").asBoolean();
+        UUID successor =
+                json.has("successorId")
+                        ? uuid(requiredString(json, "successorId"), "successorId")
+                        : null;
+        if (deleteSpace && successor != null) {
+            throw invalid("successorId", "Choose transfer or deletion");
+        }
+        return new Departure(uuid(key, "Idempotency-Key"), successor, deleteSpace);
+    }
+
+    private String requiredString(JsonNode json, String field) {
+        if (!json.hasNonNull(field)) {
+            throw new FieldValidationException(field, FieldErrorCode.REQUIRED, "Field required");
+        }
+        if (!json.get(field).isString()) {
+            throw new FieldValidationException(
+                    field, FieldErrorCode.INVALID_TYPE, "String required");
+        }
+        return json.get(field).asString();
+    }
+
+    private JsonNode object(String body, Set<String> fields) {
         JsonNode json;
         try {
             json = mapper.readTree(body);
@@ -79,6 +133,12 @@ public class SpaceRequestParser {
         }
         if (json == null || !json.isObject()) {
             throw invalid("body", "JSON object is required");
+        }
+        for (String field : json.propertyNames()) {
+            if (!fields.contains(field)) {
+                throw new FieldValidationException(
+                        field, FieldErrorCode.UNKNOWN_FIELD, "Unknown field");
+            }
         }
         return json;
     }

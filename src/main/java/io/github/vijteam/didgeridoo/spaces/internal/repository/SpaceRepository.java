@@ -13,7 +13,7 @@ import java.util.UUID;
 
 public interface SpaceRepository extends JpaRepository<Space, UUID> {
 
-    @Query(value = "SELECT id FROM spaces WHERE id = :id FOR UPDATE", nativeQuery = true)
+    @Query(value = "SELECT id FROM spaces WHERE id = :id FOR NO KEY UPDATE", nativeQuery = true)
     Optional<UUID> lockById(@Param("id") UUID id);
 
     @Query(

@@ -138,7 +138,8 @@ public class GlobalExceptionHandler {
                     REGISTRATION_CONFLICT,
                     USERNAME_UNAVAILABLE,
                     LAST_OWNER,
-                    MEMBERSHIP_CHANGE_UNAVAILABLE ->
+                    MEMBERSHIP_CHANGE_CONFLICT,
+                    TASK_ASSIGNMENT_CONFLICT ->
                     HttpStatus.CONFLICT;
             case PAYLOAD_TOO_LARGE -> HttpStatus.CONTENT_TOO_LARGE;
             case UNSUPPORTED_MEDIA_TYPE -> HttpStatus.UNSUPPORTED_MEDIA_TYPE;

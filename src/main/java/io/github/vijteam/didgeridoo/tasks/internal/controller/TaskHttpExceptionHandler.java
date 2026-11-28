@@ -5,6 +5,7 @@ import io.github.vijteam.didgeridoo.shared.FieldErrorCode;
 import io.github.vijteam.didgeridoo.shared.FieldValidationException;
 import io.github.vijteam.didgeridoo.shared.web.ApiError;
 import io.github.vijteam.didgeridoo.shared.web.GlobalExceptionHandler;
+import io.github.vijteam.didgeridoo.tasks.internal.error.TaskConflictException;
 
 import org.springframework.core.annotation.Order;
 import org.springframework.http.ResponseEntity;
@@ -14,7 +15,12 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 
 /** Reuses shared application/validation handlers; adds only tasks HTTP boundary failures. */
 @Order(-1)
-@RestControllerAdvice(assignableTypes = {TaskReadingController.class, TaskWritingController.class})
+@RestControllerAdvice(
+        assignableTypes = {
+            TaskReadingController.class,
+            TaskWritingController.class,
+            TaskClaimController.class
+        })
 public class TaskHttpExceptionHandler extends GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ApiError> invalidInput(MethodArgumentTypeMismatchException failure) {
@@ -23,6 +29,12 @@ public class TaskHttpExceptionHandler extends GlobalExceptionHandler {
                         failure.getName(),
                         FieldErrorCode.INVALID_FORMAT,
                         "Invalid request parameter"));
+    }
+
+    @ExceptionHandler(TaskConflictException.class)
+    public ResponseEntity<ApiError> assignmentConflict(TaskConflictException failure) {
+        return ResponseEntity.status(409)
+                .body(new ApiError(ApiErrorCode.TASK_ASSIGNMENT_CONFLICT, failure.getMessage()));
     }
 
     @ExceptionHandler(Exception.class)

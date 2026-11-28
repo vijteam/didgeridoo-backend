@@ -11,6 +11,7 @@ import io.github.vijteam.didgeridoo.spaces.internal.repository.SpaceRepository;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
@@ -20,7 +21,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
-public class SpaceMemberDirectory implements SpaceMembers {
+public class SpaceMemberDirectory implements SpaceMembers, SpaceMembershipLifecycle {
     private final SpaceAccess access;
     private final UserDirectory users;
     private final MemberDirectoryStore members;
@@ -63,7 +64,31 @@ public class SpaceMemberDirectory implements SpaceMembers {
     }
 
     @Override
-    @Transactional
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void lockSpace(UUID spaceId) {
+        spaces.lockById(spaceId).orElseThrow(SpaceNotFoundException::new);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public long count(UUID spaceId, SpaceRole role) {
+        return memberships.countByIdSpaceIdAndRole(spaceId, role);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void remove(UUID spaceId, UUID userId) {
+        memberships.deleteById(new SpaceMembershipId(spaceId, userId));
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void deleteSpace(UUID spaceId) {
+        spaces.deleteById(spaceId);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
     public SpaceMemberSummary changeRole(UUID actorId, UUID spaceId, UUID userId, SpaceRole role) {
         spaces.lockById(spaceId).orElseThrow(SpaceNotFoundException::new);
         access.requireOwner(spaceId, actorId);
@@ -77,11 +102,6 @@ public class SpaceMemberDirectory implements SpaceMembers {
                     && memberships.countByIdSpaceIdAndRole(spaceId, SpaceRole.OWNER) == 1) {
                 throw new MembershipRoleConflict(
                         ApiErrorCode.LAST_OWNER, "Space must retain an owner");
-            }
-            if (role == SpaceRole.GUEST) {
-                throw new MembershipRoleConflict(
-                        ApiErrorCode.MEMBERSHIP_CHANGE_UNAVAILABLE,
-                        "Guest demotion requires atomic assignment removal");
             }
             membership.changeRole(role);
         }

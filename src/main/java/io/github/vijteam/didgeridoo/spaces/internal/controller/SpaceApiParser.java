@@ -70,11 +70,6 @@ public class SpaceApiParser {
         return new InvitationRequest(requestId, username, role);
     }
 
-    public SpaceRole membershipRole(String body, MultiValueMap<String, String> query) {
-        noQuery(query);
-        return role(object(body, Set.of("role")));
-    }
-
     private SpaceRole role(JsonNode json) {
         try {
             return SpaceRole.valueOf(string(json, "role"));

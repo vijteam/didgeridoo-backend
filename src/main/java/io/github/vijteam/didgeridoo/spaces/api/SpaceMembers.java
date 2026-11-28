@@ -11,6 +11,4 @@ public interface SpaceMembers {
     }
 
     Page list(UUID actorId, UUID spaceId, SpacePageWindow window);
-
-    SpaceMemberSummary changeRole(UUID actorId, UUID spaceId, UUID userId, SpaceRole role);
 }
