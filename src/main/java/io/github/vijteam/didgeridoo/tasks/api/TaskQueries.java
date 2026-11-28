@@ -1,5 +1,6 @@
 package io.github.vijteam.didgeridoo.tasks.api;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -9,6 +10,9 @@ import java.util.UUID;
  * current snapshots, not historical metrics; missing spaces/statuses return no rows.
  */
 public interface TaskQueries {
+    /** Counts by creation time and counts open overdue tasks by deadline in [from, to). */
+    TaskMetrics metrics(UUID spaceId, UUID assigneeId, Instant from, Instant to, Instant asOf);
+
     /** Includes assigned and unassigned tasks and zero-count statuses, ordered by position. */
     List<StatusTaskCount> countByStatus(UUID spaceId);
 

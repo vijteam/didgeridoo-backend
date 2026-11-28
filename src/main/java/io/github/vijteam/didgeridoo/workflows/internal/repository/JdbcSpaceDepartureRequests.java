@@ -34,7 +34,7 @@ public class JdbcSpaceDepartureRequests implements SpaceDepartureRequests {
         return jdbc
                 .query(
                         """
-                        SELECT space_id, requested_successor, requested_deletion, outcome
+                        SELECT space_id, requested_successor, requested_deletion, allow_automatic_deletion, outcome
                         FROM space_departure_requests WHERE actor_id = ? AND request_id = ?
                         """,
                         (row, index) -> {
@@ -42,6 +42,7 @@ public class JdbcSpaceDepartureRequests implements SpaceDepartureRequests {
                             return new Recorded(
                                     successor,
                                     row.getBoolean("requested_deletion"),
+                                    row.getBoolean("allow_automatic_deletion"),
                                     new Departure(
                                             row.getObject("space_id", UUID.class),
                                             DepartureOutcome.valueOf(row.getString("outcome")),
@@ -55,18 +56,24 @@ public class JdbcSpaceDepartureRequests implements SpaceDepartureRequests {
 
     @Override
     public void save(
-            UUID actor, UUID requestId, UUID successor, boolean deleteSpace, Departure result) {
+            UUID actor,
+            UUID requestId,
+            UUID successor,
+            boolean deleteSpace,
+            boolean allowAutomaticDeletion,
+            Departure result) {
         jdbc.update(
                 """
                 INSERT INTO space_departure_requests
-                    (actor_id, request_id, space_id, requested_successor, requested_deletion, outcome)
-                VALUES (?, ?, ?, ?, ?, ?)
+                    (actor_id, request_id, space_id, requested_successor, requested_deletion, allow_automatic_deletion, outcome)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
                 actor,
                 requestId,
                 result.spaceId(),
                 successor,
                 deleteSpace,
+                allowAutomaticDeletion,
                 result.outcome().name());
     }
 }

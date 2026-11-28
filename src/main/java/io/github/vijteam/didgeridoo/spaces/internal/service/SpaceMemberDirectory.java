@@ -15,7 +15,9 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -67,6 +69,26 @@ public class SpaceMemberDirectory implements SpaceMembers, SpaceMembershipLifecy
     @Transactional(propagation = Propagation.MANDATORY)
     public void lockSpace(UUID spaceId) {
         spaces.lockById(spaceId).orElseThrow(SpaceNotFoundException::new);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<UUID> spacesForUser(UUID userId) {
+        return memberships.findSpaceIdsByUserId(userId);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Optional<UUID> successor(UUID spaceId, UUID departingUserId) {
+        return memberships
+                .findFirstByIdSpaceIdAndRoleAndIdUserIdNotOrderByJoinedAtAscIdUserIdAsc(
+                        spaceId, SpaceRole.MEMBER, departingUserId)
+                .or(
+                        () ->
+                                memberships
+                                        .findFirstByIdSpaceIdAndRoleAndIdUserIdNotOrderByJoinedAtAscIdUserIdAsc(
+                                                spaceId, SpaceRole.GUEST, departingUserId))
+                .map(member -> member.getId().getUserId());
     }
 
     @Override

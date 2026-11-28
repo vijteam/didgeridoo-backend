@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import io.github.vijteam.didgeridoo.TestcontainersConfiguration;
 import io.github.vijteam.didgeridoo.identity.internal.model.User;
 import io.github.vijteam.didgeridoo.identity.internal.repository.UserRepository;
+import io.github.vijteam.didgeridoo.spaces.api.SpaceMembershipLifecycle;
 import io.github.vijteam.didgeridoo.spaces.api.SpaceRole;
 import io.github.vijteam.didgeridoo.tasks.internal.error.TaskAccessException;
 import io.github.vijteam.didgeridoo.tasks.internal.model.AssignmentSource;
@@ -50,6 +51,7 @@ class SpaceParticipationHttpTest {
     @Autowired TaskAssignmentService assignments;
     @Autowired TaskTagService tags;
     @Autowired TransactionTemplate transaction;
+    @Autowired SpaceMembershipLifecycle lifecycle;
     MockMvc mvc;
     User owner;
     User recipient;
@@ -249,6 +251,40 @@ class SpaceParticipationHttpTest {
     }
 
     @Test
+    void accountRemovalCanFindSpacesAndChooseMemberBeforeOlderGuest() {
+        member(guest, space, "GUEST");
+        member(recipient, space, "MEMBER");
+        member(outsider, space, "MEMBER");
+        jdbc.update(
+                "UPDATE space_memberships SET joined_at=TIMESTAMPTZ '2025-01-01' WHERE space_id=? AND user_id=?",
+                space,
+                guest.getId());
+        jdbc.update(
+                "UPDATE space_memberships SET joined_at=TIMESTAMPTZ '2025-02-01' WHERE space_id=? AND role='MEMBER'",
+                space);
+        assertEquals(
+                java.util.stream.Stream.of(space, otherSpace)
+                        .sorted(java.util.Comparator.comparing(UUID::toString))
+                        .toList(),
+                lifecycle.spacesForUser(owner.getId()));
+        var firstMember =
+                java.util.stream.Stream.of(recipient.getId(), outsider.getId())
+                        .min(java.util.Comparator.comparing(UUID::toString))
+                        .orElseThrow();
+        transaction.executeWithoutResult(
+                status -> {
+                    lifecycle.lockSpace(space);
+                    assertEquals(
+                            firstMember, lifecycle.successor(space, owner.getId()).orElseThrow());
+                    lifecycle.remove(space, recipient.getId());
+                    lifecycle.remove(space, outsider.getId());
+                    assertEquals(
+                            guest.getId(), lifecycle.successor(space, owner.getId()).orElseThrow());
+                    assertTrue(lifecycle.successor(space, guest.getId()).isEmpty());
+                });
+    }
+
+    @Test
     void changesEligibleRolesAndProtectsMembershipWithRoleChecksAndCsrf() throws Exception {
         member(recipient, space, "MEMBER");
         member(guest, space, "GUEST");
@@ -418,6 +454,29 @@ class SpaceParticipationHttpTest {
                 0L,
                 jdbc.queryForObject(
                         "SELECT count(*) FROM space_tags WHERE space_id = ?", Long.class, space));
+    }
+
+    @Test
+    void guardedDepartureCannotDeleteAfterAnotherOwnerLeaves() throws Exception {
+        member(recipient, space, "OWNER");
+        member(guest, space, "GUEST");
+        depart(recipient, UUID.randomUUID().toString(), "{}")
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.outcome").value("LEFT"));
+
+        String key = UUID.randomUUID().toString();
+        depart(owner, key, "{\"allowAutomaticDeletion\":false}")
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("MEMBERSHIP_CHANGE_CONFLICT"));
+        assertEquals(1, membership(owner));
+        assertEquals(1, membership(guest));
+
+        depart(owner, key, "{\"allowAutomaticDeletion\":false,\"deleteSpace\":true}")
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.outcome").value("SPACE_DELETED"));
+        depart(owner, key, "{\"deleteSpace\":true}")
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("IDEMPOTENCY_CONFLICT"));
     }
 
     @Test

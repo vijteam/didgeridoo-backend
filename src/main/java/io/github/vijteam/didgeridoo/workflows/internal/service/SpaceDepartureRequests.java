@@ -6,11 +6,21 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface SpaceDepartureRequests {
-    record Recorded(UUID requestedSuccessor, boolean requestedDeletion, Departure result) {}
+    record Recorded(
+            UUID requestedSuccessor,
+            boolean requestedDeletion,
+            boolean allowAutomaticDeletion,
+            Departure result) {}
 
     void lock(UUID actor, UUID requestId);
 
     Optional<Recorded> find(UUID actor, UUID requestId);
 
-    void save(UUID actor, UUID requestId, UUID successor, boolean deleteSpace, Departure result);
+    void save(
+            UUID actor,
+            UUID requestId,
+            UUID successor,
+            boolean deleteSpace,
+            boolean allowAutomaticDeletion,
+            Departure result);
 }

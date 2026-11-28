@@ -189,6 +189,59 @@ class AnalyticsHttpTest {
     }
 
     @Test
+    void periodUsesCreatedAndDeadlineBoundariesButKeepsCurrentStatusCounts() throws Exception {
+        String from = "2025-01-01T00:00:00Z";
+        String to = "2025-01-08T00:00:00Z";
+        datedTask(open, member, from, from);
+        datedTask(open, member, to, to);
+        datedTask(done, member, "2025-01-07T00:00:00Z", from);
+        datedTask(open, owner, "2024-12-31T00:00:00Z", from);
+
+        mvc.perform(
+                        get(spacePath())
+                                .session(session(guest))
+                                .queryParam("from", from)
+                                .queryParam("to", to))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total").value(2))
+                .andExpect(jsonPath("$.overdue").value(2))
+                .andExpect(jsonPath("$.statuses[0].count").value(3))
+                .andExpect(jsonPath("$.statuses[1].count").value(1));
+        mvc.perform(
+                        get(memberPath(member))
+                                .session(session(member))
+                                .queryParam("from", from)
+                                .queryParam("to", to))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total").value(2))
+                .andExpect(jsonPath("$.overdue").value(1))
+                .andExpect(jsonPath("$.statuses[0].count").value(2));
+        mvc.perform(
+                        get(spacePath())
+                                .session(session(owner))
+                                .queryParam("from", to)
+                                .queryParam("to", from))
+                .andExpect(status().isBadRequest());
+        mvc.perform(get(spacePath()).session(session(owner)).queryParam("from", from))
+                .andExpect(status().isBadRequest());
+    }
+
+    private void datedTask(UUID status, UUID assignee, String created, String deadline) {
+        jdbc.update(
+                """
+                INSERT INTO tasks(space_id, creator_user_id, assignee_user_id, status_id, title,
+                                  assignment_source, created_at, deadline_at)
+                VALUES (?, ?, ?, ?, 'Analytics dated task', 'DIRECT', CAST(? AS timestamptz), CAST(? AS timestamptz))
+                """,
+                space,
+                owner,
+                assignee,
+                status,
+                created,
+                deadline);
+    }
+
+    @Test
     void roleCheckAndCountsShareASnapshotAcrossAConcurrentCommit() throws Exception {
         task(open, member);
         doAnswer(
@@ -280,7 +333,7 @@ class AnalyticsHttpTest {
 
     private String snapshot(int openCount, int doneCount) {
         return """
-                {"total":%d,"statuses":[
+                {"total":%d,"overdue":0,"statuses":[
                   {"statusId":"%s","name":"Open","position":0,"count":%d},
                   {"statusId":"%s","name":"Done","position":10,"count":%d}
                 ]}

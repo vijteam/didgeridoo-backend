@@ -1,12 +1,15 @@
 package io.github.vijteam.didgeridoo.tasks.internal.service;
 
 import io.github.vijteam.didgeridoo.tasks.api.StatusTaskCount;
+import io.github.vijteam.didgeridoo.tasks.api.TaskMetrics;
 import io.github.vijteam.didgeridoo.tasks.api.TaskQueries;
+import io.github.vijteam.didgeridoo.tasks.internal.repository.TaskMetricsRepository;
 import io.github.vijteam.didgeridoo.tasks.internal.repository.TaskStatusRepository;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -16,8 +19,18 @@ import java.util.UUID;
 public class TaskQueriesService implements TaskQueries {
     private final TaskStatusRepository statuses;
 
-    public TaskQueriesService(TaskStatusRepository statuses) {
+    private final TaskMetricsRepository metrics;
+
+    public TaskQueriesService(TaskStatusRepository statuses, TaskMetricsRepository metrics) {
         this.statuses = statuses;
+        this.metrics = metrics;
+    }
+
+    @Override
+    public TaskMetrics metrics(
+            UUID spaceId, UUID assigneeId, Instant from, Instant to, Instant asOf) {
+        Objects.requireNonNull(spaceId, "spaceId");
+        return metrics.count(spaceId, assigneeId, from, to, asOf);
     }
 
     @Override

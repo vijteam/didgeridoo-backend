@@ -86,6 +86,7 @@ public class SpaceMembershipController {
                 space,
                 departure.requestId(),
                 departure.successorId(),
-                departure.deleteSpace());
+                departure.deleteSpace(),
+                departure.allowAutomaticDeletion());
     }
 }
