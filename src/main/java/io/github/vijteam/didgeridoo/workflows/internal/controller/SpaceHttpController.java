@@ -1,8 +1,8 @@
 package io.github.vijteam.didgeridoo.workflows.internal.controller;
 
-import io.github.vijteam.didgeridoo.identity.api.UserDirectory;
 import io.github.vijteam.didgeridoo.shared.ApiErrorCode;
 import io.github.vijteam.didgeridoo.shared.web.ApiError;
+import io.github.vijteam.didgeridoo.spaces.api.SpaceActorResolver;
 import io.github.vijteam.didgeridoo.spaces.api.SpaceQueries;
 import io.github.vijteam.didgeridoo.spaces.api.SpaceSummary;
 import io.github.vijteam.didgeridoo.workflows.internal.service.SpaceCreationWorkflow;
@@ -30,17 +30,17 @@ import java.util.UUID;
 public class SpaceHttpController {
     private final SpaceQueries spaces;
     private final SpaceCreationWorkflow creation;
-    private final UserDirectory users;
+    private final SpaceActorResolver actors;
     private final SpaceRequestParser parser;
 
     public SpaceHttpController(
             SpaceQueries spaces,
             SpaceCreationWorkflow creation,
-            UserDirectory users,
+            SpaceActorResolver actors,
             SpaceRequestParser parser) {
         this.spaces = spaces;
         this.creation = creation;
-        this.users = users;
+        this.actors = actors;
         this.parser = parser;
     }
 
@@ -52,7 +52,7 @@ public class SpaceHttpController {
 
     @GetMapping
     public SpacePage list(Principal principal, @RequestParam MultiValueMap<String, String> query) {
-        UUID actor = actor(principal);
+        UUID actor = actors.requireUser(principal);
         SpaceRequestParser.Search search = parser.search(query);
         var result = spaces.search(actor, search.name(), search.page(), search.size());
         return new SpacePage(
@@ -64,7 +64,7 @@ public class SpaceHttpController {
             Principal principal,
             @PathVariable String spaceId,
             @RequestParam MultiValueMap<String, String> query) {
-        UUID actor = actor(principal);
+        UUID actor = actors.requireUser(principal);
         return spaces.get(actor, parser.resourceId(spaceId, query));
     }
 
@@ -74,7 +74,7 @@ public class SpaceHttpController {
             @RequestBody String body,
             @RequestHeader(name = "Idempotency-Key", required = false) String requestKey,
             @RequestParam MultiValueMap<String, String> query) {
-        UUID actor = actor(principal);
+        UUID actor = actors.requireUser(principal);
         SpaceRequestParser.Create command = parser.create(body, requestKey, query);
         SpaceSummary result = creation.create(actor, command.requestId(), command.name());
         return ResponseEntity.created(URI.create("/api/v1/spaces/" + result.id())).body(result);
@@ -86,17 +86,5 @@ public class SpaceHttpController {
                 .error("Space storage operation failed", ex);
         return ResponseEntity.internalServerError()
                 .body(new ApiError(ApiErrorCode.INTERNAL_ERROR, "Unable to process request"));
-    }
-
-    private UUID actor(Principal principal) {
-        if (principal == null) {
-            throw new SpaceHttpException(ApiErrorCode.UNAUTHENTICATED, "Authentication required");
-        }
-        return users.findByUsername(principal.getName())
-                .orElseThrow(
-                        () ->
-                                new SpaceHttpException(
-                                        ApiErrorCode.UNAUTHENTICATED, "Authentication required"))
-                .id();
     }
 }
