@@ -2,7 +2,9 @@ package io.github.vijteam.didgeridoo.spaces.internal.service;
 
 import io.github.vijteam.didgeridoo.identity.api.UserDirectory;
 import io.github.vijteam.didgeridoo.spaces.api.SpaceAccess;
+import io.github.vijteam.didgeridoo.spaces.api.SpaceCreation;
 import io.github.vijteam.didgeridoo.spaces.api.SpaceNotFoundException;
+import io.github.vijteam.didgeridoo.spaces.api.SpaceQueries;
 import io.github.vijteam.didgeridoo.spaces.api.SpaceRole;
 import io.github.vijteam.didgeridoo.spaces.api.SpaceSummary;
 import io.github.vijteam.didgeridoo.spaces.internal.model.Space;
@@ -20,7 +22,7 @@ import java.util.UUID;
 
 @Service
 @Transactional(readOnly = true)
-public class SpaceService {
+public class SpaceService implements SpaceCreation, SpaceQueries {
     private final SpaceRepository spaces;
     private final SpaceMembershipRepository memberships;
     private final UserDirectory users;
@@ -37,6 +39,7 @@ public class SpaceService {
         this.access = access;
     }
 
+    @Override
     @Transactional
     public SpaceSummary createWithOwner(UUID actorId, String name) {
         requireActor(actorId);
@@ -68,13 +71,18 @@ public class SpaceService {
     public Page<SpaceSummary> search(UUID actorId, String name, int page, int size) {
         requireActor(actorId);
 
-        if (name == null || page < 0 || size < 1 || size > 100) {
+        if (name == null || invalidPagination(page, size)) {
             throw new IllegalArgumentException("Search name and valid pagination are required");
         }
 
         PageRequest request = PageRequest.of(page, size, Sort.by("name", "id"));
         return spaces.findByMemberUserIdAndNameContainingIgnoreCase(actorId, name, request)
                 .map(SpaceService::toSummary);
+    }
+
+    private static boolean invalidPagination(int page, int size) {
+        boolean outOfBounds = page < 0 || size < 1 || size > 100;
+        return outOfBounds || (long) page * size > Integer.MAX_VALUE;
     }
 
     private static void requireActor(UUID actorId) {

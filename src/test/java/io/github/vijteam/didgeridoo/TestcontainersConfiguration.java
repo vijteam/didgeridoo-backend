@@ -15,7 +15,10 @@ public class TestcontainersConfiguration {
             name = "test.postgres.container",
             havingValue = "true",
             matchIfMissing = true)
-    PostgreSQLContainer postgresContainer() {
-        return new PostgreSQLContainer("postgres:17");
+    PostgreSQLContainer postgresContainer(
+            @org.springframework.beans.factory.annotation.Value(
+                            "${test.postgres.image:postgres:17}")
+                    String image) {
+        return new PostgreSQLContainer(image);
     }
 }

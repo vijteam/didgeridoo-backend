@@ -1,7 +1,10 @@
 package io.github.vijteam.didgeridoo.spaces.api;
 
-public class SpaceNotFoundException extends RuntimeException {
+import io.github.vijteam.didgeridoo.shared.ApiErrorCode;
+import io.github.vijteam.didgeridoo.shared.ApplicationException;
+
+public class SpaceNotFoundException extends ApplicationException {
     public SpaceNotFoundException() {
-        super("Space not found");
+        super(ApiErrorCode.NOT_FOUND, "Space not found");
     }
 }
